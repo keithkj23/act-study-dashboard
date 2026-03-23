@@ -1,0 +1,15 @@
+{
+  "name": "act-study-dashboard",
+  "version": "1.0.0",
+  "description": "ACT Study Dashboard with Supabase authentication and cloud sync",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve ."
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.0.0"
+  },
+  "keywords": ["act", "study", "dashboard", "supabase", "react"],
+  "author": "Keith",
+  "license": "ISC"
+}

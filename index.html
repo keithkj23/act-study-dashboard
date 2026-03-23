@@ -1,0 +1,1936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ACT Study Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.2.1/math.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <style>
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    // Destructure React hooks from global React
+    const { useState, useEffect, useRef } = React;
+
+// ═══════════════════════════════════════════════════════════
+// SUPABASE CONFIG — Replace these with YOUR project values
+// ═══════════════════════════════════════════════════════════
+const SUPABASE_URL = 'YOUR_SUPABASE_URL_HERE';       // e.g. https://abcdefg.supabase.co
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY_HERE'; // e.g. eyJhbGciOi...
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ═══════════════════════════════════════════════════════════
+// AUTH SCREEN — Login / Sign Up
+// ═══════════════════════════════════════════════════════════
+function AuthScreen({ onLogin }) {
+  const [mode, setMode] = useState("login"); // "login" or "signup"
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [testDate, setTestDate] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  const handleSubmit = async () => {
+    if (mode === "signup" && (!firstName || !lastName)) { setError("Please enter your first and last name."); return; }
+    setLoading(true);
+    setError("");
+    setMessage("");
+
+    if (mode === "signup") {
+      const { data, error: err } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { first_name: firstName, last_name: lastName, display_name: firstName, test_date: testDate || null } }
+      });
+      if (err) setError(err.message);
+      else if (data.user && !data.session) setMessage("Check your email to confirm your account, then log in!");
+      else if (data.session) onLogin(data.session.user);
+    } else {
+      const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
+      if (err) setError(err.message);
+      else onLogin(data.session.user);
+    }
+    setLoading(false);
+  };
+
+  const inputClass = "w-full px-4 py-3 rounded-xl border border-gray-200 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent";
+
+  // Floating background icons
+  const floatingIcons = [
+    { emoji: "📝", top: "8%", left: "8%", size: "2.5rem", delay: "0s", duration: "6s" },
+    { emoji: "🔢", top: "15%", right: "12%", size: "2rem", delay: "1s", duration: "7s" },
+    { emoji: "📚", bottom: "20%", left: "10%", size: "2.2rem", delay: "2s", duration: "5s" },
+    { emoji: "🔬", top: "40%", right: "8%", size: "1.8rem", delay: "0.5s", duration: "8s" },
+    { emoji: "✍️", bottom: "12%", right: "15%", size: "2rem", delay: "3s", duration: "6s" },
+    { emoji: "🎯", top: "60%", left: "6%", size: "1.8rem", delay: "1.5s", duration: "7s" },
+    { emoji: "📐", top: "25%", left: "20%", size: "1.6rem", delay: "2.5s", duration: "5.5s" },
+    { emoji: "🧠", bottom: "30%", right: "20%", size: "2rem", delay: "0.8s", duration: "6.5s" },
+  ];
+
+  return (
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden" style={{ background: "linear-gradient(135deg, #1E3A5F 0%, #2D1B69 40%, #1E3A5F 70%, #0F172A 100%)" }}>
+
+      {/* Animated floating icons */}
+      {floatingIcons.map((icon, i) => (
+        <div key={i} className="absolute opacity-20 pointer-events-none select-none" style={{
+          top: icon.top, left: icon.left, right: icon.right, bottom: icon.bottom,
+          fontSize: icon.size,
+          animation: `floatAuth ${icon.duration} ease-in-out ${icon.delay} infinite`,
+        }}>{icon.emoji}</div>
+      ))}
+
+      {/* Glowing orbs */}
+      <div className="absolute w-72 h-72 rounded-full opacity-15 pointer-events-none" style={{ background: "radial-gradient(circle, #3B82F6, transparent)", top: "-10%", left: "-10%" }} />
+      <div className="absolute w-96 h-96 rounded-full opacity-10 pointer-events-none" style={{ background: "radial-gradient(circle, #8B5CF6, transparent)", bottom: "-15%", right: "-10%" }} />
+      <div className="absolute w-48 h-48 rounded-full opacity-10 pointer-events-none" style={{ background: "radial-gradient(circle, #10B981, transparent)", top: "50%", left: "60%" }} />
+
+      {/* Main card */}
+      <div className="w-full max-w-md mx-4 rounded-3xl p-8 backdrop-blur-2xl bg-white/10 border border-white/20 shadow-2xl relative z-10">
+
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white/10 text-white/60 text-xs font-medium mb-4 border border-white/10">
+            📖 Your path to a great score starts here
+          </div>
+          <h1 className="text-3xl font-black text-white tracking-tight mb-1">ACT Study Dashboard</h1>
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-blue-400/40 to-transparent" />
+            <span className="text-blue-300/80 text-xs font-semibold tracking-widest uppercase">2025–2026</span>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-purple-400/40 to-transparent" />
+          </div>
+          <p className="text-white/50 text-sm">
+            {mode === "login" ? "Welcome back — pick up where you left off." : "Create your account to start studying."}
+          </p>
+        </div>
+
+        {/* Subject chips */}
+        <div className="flex justify-center gap-2 mb-6 flex-wrap">
+          {[
+            { label: "English", color: "#3B82F6", icon: "📝" },
+            { label: "Math", color: "#10B981", icon: "🔢" },
+            { label: "Reading", color: "#8B5CF6", icon: "📚" },
+            { label: "Science", color: "#F59E0B", icon: "🔬" },
+            { label: "Writing", color: "#F43F5E", icon: "✍️" },
+          ].map(s => (
+            <span key={s.label} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border" style={{ backgroundColor: `${s.color}15`, color: s.color, borderColor: `${s.color}30` }}>
+              {s.icon} {s.label}
+            </span>
+          ))}
+        </div>
+
+        {error && <div className="mb-4 p-3 rounded-xl bg-red-500/20 border border-red-400/30 text-red-200 text-sm">{error}</div>}
+        {message && <div className="mb-4 p-3 rounded-xl bg-green-500/20 border border-green-400/30 text-green-200 text-sm">{message}</div>}
+
+        {/* Form fields */}
+        <div className="flex flex-col gap-3 mb-5">
+          {mode === "signup" && (
+            <>
+              <div className="flex gap-3">
+                <input type="text" placeholder="First Name" value={firstName} onChange={e => setFirstName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-white/15 bg-white/10 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-transparent" />
+                <input type="text" placeholder="Last Name" value={lastName} onChange={e => setLastName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-white/15 bg-white/10 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-transparent" />
+              </div>
+              <div className="relative">
+                <input type="date" value={testDate} onChange={e => setTestDate(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-white/15 bg-white/10 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-transparent"
+                  style={{ colorScheme: "dark" }} />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 text-xs pointer-events-none">Scheduled Test Date (optional)</span>
+              </div>
+            </>
+          )}
+          <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl border border-white/15 bg-white/10 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-transparent" />
+          <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleSubmit()}
+            className="w-full px-4 py-3 rounded-xl border border-white/15 bg-white/10 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-transparent" />
+        </div>
+
+        <button onClick={handleSubmit} disabled={loading || !email || !password}
+          className="w-full py-3.5 rounded-xl font-bold text-white shadow-lg disabled:opacity-40 transition-all hover:scale-[1.02] active:scale-[0.98] text-sm"
+          style={{ background: "linear-gradient(135deg, #3B82F6, #8B5CF6, #6366F1)" }}>
+          {loading ? "..." : mode === "login" ? "Log In →" : "Create Account →"}
+        </button>
+
+        <p className="text-center text-sm text-white/40 mt-5">
+          {mode === "login" ? "Don't have an account? " : "Already have an account? "}
+          <button onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); setMessage(""); }}
+            className="text-blue-300 font-semibold hover:text-blue-200 transition">
+            {mode === "login" ? "Sign Up" : "Log In"}
+          </button>
+        </p>
+
+        {/* Feature highlights on login */}
+        {mode === "login" && (
+          <div className="mt-6 pt-5 border-t border-white/10 grid grid-cols-3 gap-3">
+            {[
+              { icon: "🎴", label: "Flashcards" },
+              { icon: "📊", label: "Quizzes" },
+              { icon: "⏱", label: "Test Sim" },
+            ].map(f => (
+              <div key={f.label} className="text-center">
+                <div className="text-xl mb-1">{f.icon}</div>
+                <div className="text-white/40 text-[10px] font-medium">{f.label}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* CSS animation for floating icons */}
+      <style>{`
+        @keyframes floatAuth {
+          0%, 100% { transform: translateY(0px) rotate(0deg); }
+          33% { transform: translateY(-12px) rotate(5deg); }
+          66% { transform: translateY(8px) rotate(-3deg); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// CLOUD SYNC HELPERS — Save/load progress from Supabase
+// ═══════════════════════════════════════════════════════════
+async function loadCloudProgress(userId) {
+  const { data, error } = await supabase
+    .from('user_progress')
+    .select('progress_data')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) { console.error('Load error:', error); return []; }
+  return data?.progress_data?.examHistory || [];
+}
+
+async function saveCloudProgress(userId, examHistory) {
+  const payload = { user_id: userId, progress_data: { examHistory }, updated_at: new Date().toISOString() };
+  const { error } = await supabase
+    .from('user_progress')
+    .upsert(payload, { onConflict: 'user_id' });
+  if (error) console.error('Save error:', error);
+}
+
+// ═══════════════════════════════════════════════════════════
+// SINGLE-SESSION ENFORCEMENT
+// ═══════════════════════════════════════════════════════════
+// Generate a unique token for this browser tab/session
+const SESSION_TOKEN = crypto.randomUUID();
+
+async function registerSession(userId) {
+  const { error } = await supabase
+    .from('user_progress')
+    .upsert({ user_id: userId, session_token: SESSION_TOKEN, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+  if (error) console.error('Session register error:', error);
+}
+
+async function checkSession(userId) {
+  const { data, error } = await supabase
+    .from('user_progress')
+    .select('session_token')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) { console.error('Session check error:', error); return true; } // fail open
+  // If no row yet or tokens match, session is valid
+  if (!data || !data.session_token || data.session_token === SESSION_TOKEN) return true;
+  // Token mismatch — another device logged in
+  return false;
+}
+
+// ═══════════════════════════════════════════════════════════
+// USER HELPERS
+// ═══════════════════════════════════════════════════════════
+function getUserName(user) {
+  const meta = user?.user_metadata;
+  if (meta?.first_name) return meta.first_name;
+  if (meta?.display_name) return meta.display_name;
+  return user?.email?.split('@')[0] || 'Student';
+}
+
+function getUserFullName(user) {
+  const meta = user?.user_metadata;
+  if (meta?.first_name && meta?.last_name) return `${meta.first_name} ${meta.last_name}`;
+  if (meta?.display_name) return meta.display_name;
+  return user?.email?.split('@')[0] || 'Student';
+}
+
+function getUserTestDate(user) {
+  return user?.user_metadata?.test_date || null;
+}
+
+// ═══════════════════════════════════════════════════════════
+// PROFILE PAGE
+// ═══════════════════════════════════════════════════════════
+function ProfilePage({ user, onLogout }) {
+  const meta = user?.user_metadata || {};
+  const [firstName, setFirstName] = useState(meta.first_name || "");
+  const [lastName, setLastName] = useState(meta.last_name || "");
+  const [testDate, setTestDate] = useState(meta.test_date || "");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState("");
+  const [message, setMessage] = useState({ type: "", text: "" });
+
+  const showMsg = (type, text) => { setMessage({ type, text }); setTimeout(() => setMessage({ type: "", text: "" }), 5000); };
+
+  const updateProfile = async () => {
+    setLoading("profile");
+    const { error } = await supabase.auth.updateUser({ data: { first_name: firstName, last_name: lastName, display_name: firstName, test_date: testDate || null } });
+    if (error) showMsg("error", error.message);
+    else showMsg("success", "Profile updated! Changes will appear next time you load the app.");
+    setLoading("");
+  };
+
+  const updateEmail = async () => {
+    if (!newEmail) return;
+    setLoading("email");
+    const { error } = await supabase.auth.updateUser({ email: newEmail });
+    if (error) showMsg("error", error.message);
+    else showMsg("success", "Confirmation email sent to your new address. Check your inbox to confirm the change.");
+    setLoading("");
+    setNewEmail("");
+  };
+
+  const updatePassword = async () => {
+    if (newPassword.length < 6) { showMsg("error", "Password must be at least 6 characters."); return; }
+    if (newPassword !== confirmPassword) { showMsg("error", "Passwords don't match."); return; }
+    setLoading("password");
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) showMsg("error", error.message);
+    else showMsg("success", "Password updated successfully!");
+    setLoading("");
+    setNewPassword("");
+    setConfirmPassword("");
+  };
+
+  const daysUntilTest = testDate ? Math.ceil((new Date(testDate) - new Date()) / (1000 * 60 * 60 * 24)) : null;
+
+  const inputClass = "w-full px-4 py-3 rounded-xl border border-gray-200 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent";
+  const btnClass = "px-5 py-2.5 rounded-xl font-semibold text-white text-sm shadow-md disabled:opacity-40 transition";
+
+  return (
+    <div className="flex-1 overflow-y-auto" style={{ background: "linear-gradient(135deg, #EFF6FF 0%, #F5F3FF 35%, #FFF7ED 70%, #FFF1F2 100%)" }}>
+      <div className="max-w-lg mx-auto px-6 py-8">
+        <h2 className="text-2xl font-bold text-gray-800 mb-1">👤 Profile</h2>
+        <p className="text-gray-500 text-sm mb-6">Manage your account settings</p>
+
+        {message.text && (
+          <div className={`mb-5 p-3 rounded-xl text-sm ${message.type === "error" ? "bg-red-50 border border-red-200 text-red-700" : "bg-green-50 border border-green-200 text-green-700"}`}>
+            {message.text}
+          </div>
+        )}
+
+        {/* Account Info Card */}
+        <div className={`rounded-2xl p-5 mb-4 backdrop-blur-xl bg-white/70 border border-white/40 shadow-lg`}>
+          <h3 className="font-bold text-gray-700 mb-3">Account Information</h3>
+          <div className="flex flex-col gap-2 text-sm">
+            <div className="flex justify-between py-2 border-b border-gray-100"><span className="text-gray-500">Name</span><span className="font-medium text-gray-800">{getUserFullName(user)}</span></div>
+            <div className="flex justify-between py-2 border-b border-gray-100"><span className="text-gray-500">Email</span><span className="font-medium text-gray-800">{user.email}</span></div>
+            {testDate && (
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-gray-500">Test Date</span>
+                <span className="font-medium text-gray-800">
+                  {new Date(testDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  {daysUntilTest > 0 && <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-600">{daysUntilTest} days away</span>}
+                  {daysUntilTest <= 0 && daysUntilTest !== null && <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-600">Completed</span>}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between py-2 border-b border-gray-100"><span className="text-gray-500">User ID</span><span className="font-mono text-xs text-gray-400">{user.id.slice(0, 8)}...</span></div>
+            <div className="flex justify-between py-2"><span className="text-gray-500">Member Since</span><span className="font-medium text-gray-800">{new Date(user.created_at).toLocaleDateString()}</span></div>
+          </div>
+        </div>
+
+        {/* Edit Profile */}
+        <div className={`rounded-2xl p-5 mb-4 backdrop-blur-xl bg-white/70 border border-white/40 shadow-lg`}>
+          <h3 className="font-bold text-gray-700 mb-3">Edit Profile</h3>
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-3">
+              <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="First Name" className={inputClass} />
+              <input type="text" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Last Name" className={inputClass} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Scheduled Test Date</label>
+              <input type="date" value={testDate} onChange={e => setTestDate(e.target.value)} className={inputClass} />
+            </div>
+            <button onClick={updateProfile} disabled={loading === "profile" || (!firstName && !lastName)} className={`${btnClass} w-full`} style={{ backgroundColor: "#3B82F6" }}>
+              {loading === "profile" ? "..." : "Save Profile"}
+            </button>
+          </div>
+        </div>
+
+        {/* Update Email */}
+        <div className={`rounded-2xl p-5 mb-4 backdrop-blur-xl bg-white/70 border border-white/40 shadow-lg`}>
+          <h3 className="font-bold text-gray-700 mb-3">Change Email</h3>
+          <p className="text-xs text-gray-500 mb-3">A confirmation link will be sent to your new email address.</p>
+          <div className="flex gap-2">
+            <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="New email address" className={inputClass} />
+            <button onClick={updateEmail} disabled={loading === "email" || !newEmail} className={btnClass} style={{ backgroundColor: "#8B5CF6" }}>
+              {loading === "email" ? "..." : "Update"}
+            </button>
+          </div>
+        </div>
+
+        {/* Update Password */}
+        <div className={`rounded-2xl p-5 mb-4 backdrop-blur-xl bg-white/70 border border-white/40 shadow-lg`}>
+          <h3 className="font-bold text-gray-700 mb-3">Change Password</h3>
+          <div className="flex flex-col gap-3">
+            <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="New password (min 6 characters)" className={inputClass} />
+            <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Confirm new password" className={inputClass} />
+            <button onClick={updatePassword} disabled={loading === "password" || !newPassword || !confirmPassword} className={`${btnClass} w-full`} style={{ backgroundColor: "#10B981" }}>
+              {loading === "password" ? "..." : "Update Password"}
+            </button>
+          </div>
+        </div>
+
+        {/* Logout */}
+        <div className={`rounded-2xl p-5 backdrop-blur-xl bg-white/70 border border-white/40 shadow-lg`}>
+          <h3 className="font-bold text-gray-700 mb-3">Session</h3>
+          <button onClick={onLogout} className="w-full py-3 rounded-xl font-semibold text-red-500 border-2 border-red-200 hover:bg-red-50 transition text-sm">
+            🚪 Log Out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════
+
+// ── Enhanced ACT (2025-2026) ──
+// Science is OPTIONAL and scored separately (not in composite).
+// Composite = average of English + Math + Reading only.
+// Math now has 4 answer choices instead of 5.
+const SECTIONS = {
+  english: { name: "English", icon: "📝", accent: "#3B82F6", questions: 50, minutes: 35, desc: "Production of Writing, Knowledge of Language & Conventions", required: true },
+  math:    { name: "Math",    icon: "🔢", accent: "#10B981", questions: 45, minutes: 50, desc: "Algebra, functions, geometry, statistics & modeling", required: true },
+  reading: { name: "Reading", icon: "📚", accent: "#8B5CF6", questions: 36, minutes: 40, desc: "3 standalone passages + 1 paired set", required: true },
+  science: { name: "Science", icon: "🔬", accent: "#F59E0B", questions: 40, minutes: 40, desc: "Optional — scored separately, not in composite", required: false },
+  writing: { name: "Writing", icon: "✍️", accent: "#F43F5E", questions: 1, minutes: 40, desc: "Optional essay — scored 2-12 separately", required: false },
+};
+
+const FLASHCARDS = {
+  english: [
+    // ── Conventions of Standard English (14-24% of Enhanced ACT) ──
+    { front: "Subject-Verb Agreement", back: "Subject and verb must agree in number.\n• Singular subject → singular verb\n• Plural subject → plural verb\n\n✓ The team is playing well.\n✗ The team are playing well.\n\nTip: Ignore prepositional phrases between subject and verb.\nTip: Compound subjects with 'and' are plural; with 'or/nor' match the closer noun." },
+    { front: "Comma Rules (Top 5)", back: "1. Before FANBOYS joining independent clauses: I ran, but she walked.\n2. After introductory elements: After lunch, we left.\n3. Around nonessential info: My dog, a poodle, barks.\n4. Between list items: I bought eggs, milk, and bread.\n5. NOT between subject and verb: ✗ The dog, ran away.\n\nComma splices (joining clauses with only a comma) are ALWAYS wrong on the ACT." },
+    { front: "Apostrophe Rules", back: "Possessives: the dog's bone, the students' scores\nContractions: it's (= it is), they're (= they are)\n\nNEVER for plurals:\n✗ The dog's are barking.\n✓ The dogs are barking.\n\nTricky ones:\nits = possessive (The cat licked its paw)\nit's = it is\nwho's = who is | whose = possessive" },
+    { front: "Pronoun Errors", back: "Agreement: pronoun must match antecedent in number\n• Everyone should bring his or her book (singular)\n• The students brought their books (plural)\n\nCase: subject vs. object pronouns\n• She and I went (subject) — NOT her and me\n• Give it to him and me (object) — NOT he and I\n\nAmbiguity: Unclear pronoun reference\n✗ 'Tom told Mike he was late.' (Who is 'he'?)" },
+    // ── Knowledge of Language (38-43% — BIGGEST section on Enhanced ACT) ──
+    { front: "Conciseness (Enhanced ACT Focus)", back: "The ACT rewards CONCISE writing. Eliminate:\n• Redundancy: 'past history' → 'history'\n• Wordiness: 'due to the fact that' → 'because'\n• Filler: 'it is important to note that' → cut it\n\nRule of thumb: If two answers say the same thing but one is shorter and grammatically correct, choose the shorter one.\n\nCommon redundancies: 'advance forward,' 'basic fundamentals,' 'collaborate together,' 'each and every'" },
+    { front: "Tone & Style Consistency", back: "Enhanced ACT tests whether you can match the passage's established tone.\n\nFormal passage: avoid slang, contractions, casual phrasing\nInformal/narrative: avoid overly academic language\n\nWatch for:\n• 'Furthermore' in a casual blog post (too formal)\n• 'totally awesome' in a scientific article (too casual)\n\nAll questions now have question stems telling you what skill is being tested — use this!" },
+    { front: "Precision & Word Choice", back: "Choose the word that PRECISELY conveys the intended meaning.\n\nCommonly confused:\n• affect (verb) vs. effect (noun)\n• than (comparison) vs. then (sequence)\n• fewer (countable) vs. less (uncountable)\n• who (people) vs. which/that (things)\n• accept (receive) vs. except (exclude)\n\nContext matters: 'The news was unsettling' vs. 'disturbing' vs. 'concerning' — each has a different intensity." },
+    // ── Production of Writing (38-43% — equally big on Enhanced ACT) ──
+    { front: "Transition Words & Logic", back: "Contrast: however, although, nevertheless, on the other hand\nCause/Effect: therefore, consequently, as a result, thus\nAddition: furthermore, moreover, in addition\nExample: for instance, specifically, namely\nSequence: first, subsequently, finally\n\nKey: Read the sentences BEFORE and AFTER. The transition must match the LOGICAL relationship between them." },
+    { front: "Sentence & Paragraph Placement", back: "Enhanced ACT asks: 'Where should this sentence be placed?'\n\nStrategy:\n1. Read the sentence carefully\n2. Look for context clues (pronouns, transitions, specific references)\n3. The sentence should logically follow what comes before and lead into what comes after\n4. Pronouns like 'this' or 'these' need a preceding reference\n5. Try each position mentally" },
+    { front: "Adding/Deleting Sentences", back: "Enhanced ACT asks: 'Should the writer add/delete this sentence?'\n\nAsk yourself:\n• Does it support the paragraph's MAIN POINT?\n• Does it maintain FOCUS (not go off-topic)?\n• Does it add NEW, relevant information?\n\nDelete if: redundant, off-topic, contradicts the tone\nAdd if: supports the argument, provides needed evidence, improves flow\n\nAlways check the YES/NO reason — the reason matters as much as the choice." },
+    { front: "Author's Purpose & Audience", back: "Enhanced ACT now heavily tests rhetorical awareness.\n\nAsk: WHO is the audience? WHAT is the goal?\n\n• Persuasive → strong claims, evidence, emotional appeals\n• Informative → neutral tone, facts, clear organization\n• Narrative → vivid details, personal voice, storytelling\n\nWhen asked 'Does this accomplish the author's goal?'\n→ Reread the stated goal carefully\n→ Check if the passage actually achieves it" },
+    { front: "Enhanced ACT English — Key Changes", back: "NEW FORMAT: 50 questions, 35 minutes (42 sec each)\n\nBiggest shift: MORE rhetoric & language questions, FEWER pure grammar.\n\nContent breakdown:\n• Production of Writing: 38-43%\n• Knowledge of Language: 38-43%\n• Conventions of Standard English: 14-24%\n\nAll questions now have QUESTION STEMS telling you exactly what's being tested.\n\n~10 questions are unscored field-test items (you won't know which ones)." },
+  ],
+  math: [
+    // ── Algebra (17-20%) ──
+    { front: "Quadratic Formula", back: "For ax² + bx + c = 0:\n\nx = (-b ± √(b² - 4ac)) / 2a\n\nDiscriminant (b² - 4ac):\n• > 0 → two real solutions\n• = 0 → one real solution\n• < 0 → no real solutions\n\nFactoring shortcut: If ax² + bx + c factors nicely, find two numbers that multiply to ac and add to b." },
+    { front: "Slope & Line Equations", back: "Slope: m = (y₂ - y₁) / (x₂ - x₁)\n\nForms:\n• Slope-intercept: y = mx + b\n• Point-slope: y - y₁ = m(x - x₁)\n• Standard: Ax + By = C\n\nParallel lines: same slope (m₁ = m₂)\nPerpendicular: negative reciprocals (m₁ × m₂ = -1)\n\nHorizontal line: y = k (slope 0)\nVertical line: x = k (undefined slope)" },
+    { front: "Systems of Equations", back: "Substitution: Solve one eq for a variable, plug into other\nElimination: Add/subtract equations to cancel a variable\n\nSolutions:\n• One solution → lines intersect\n• No solution → parallel lines (same slope, diff intercept)\n• Infinite → same line\n\nOn Enhanced ACT: Only 4 answer choices now — makes elimination easier!" },
+    { front: "Laws of Exponents & Radicals", back: "aᵐ · aⁿ = aᵐ⁺ⁿ | aᵐ / aⁿ = aᵐ⁻ⁿ\n(aᵐ)ⁿ = aᵐⁿ | a⁰ = 1 | a⁻ⁿ = 1/aⁿ\n(ab)ⁿ = aⁿbⁿ\n\nRadicals:\n√(ab) = √a · √b\n√(a/b) = √a / √b\na^(1/n) = ⁿ√a\na^(m/n) = ⁿ√(aᵐ)\n\nRationalizing: multiply by √x/√x to clear radicals from denominator" },
+    // ── Functions (17-20%) ──
+    { front: "Function Basics & Notation", back: "f(x) means 'the output when input is x'\nf(3) = plug in 3 for every x\n\nDomain: all valid inputs (watch for ÷0 and negative √)\nRange: all possible outputs\n\nComposition: (f∘g)(x) = f(g(x)) — plug g into f\nInverse: f⁻¹ switches input/output. If f(2)=5, then f⁻¹(5)=2\n\nVertical line test: If a vertical line hits a graph twice, it's NOT a function." },
+    { front: "Linear vs. Exponential Growth", back: "Linear: y = mx + b\n• Constant rate of change (adds same amount)\n• Graph is a straight line\n\nExponential: y = a · bˣ\n• Constant PERCENT change (multiplies by same factor)\n• b > 1: growth | 0 < b < 1: decay\n\nACT modeling questions often ask you to identify which type fits a real-world scenario (population growth = exponential, hourly wage = linear)." },
+    // ── Geometry (17-20%) ──
+    { front: "Area & Perimeter Formulas", back: "Triangle: A = ½bh\nCircle: A = πr², C = 2πr (use RADIUS not diameter!)\nRectangle: A = lw, P = 2l + 2w\nTrapezoid: A = ½(b₁+b₂)h\nParallelogram: A = bh\n\nSector: A = (θ/360)πr²\nArc length: L = (θ/360) × 2πr\n\nVolume: Cylinder = πr²h | Cone = ⅓πr²h | Sphere = ⁴⁄₃πr³" },
+    { front: "Pythagorean Theorem & Special Triangles", back: "a² + b² = c² (c = hypotenuse)\n\nCommon triples (MEMORIZE): 3-4-5, 5-12-13, 8-15-17\nMultiples work: 6-8-10, 9-12-15, 10-24-26\n\nSpecial right triangles:\n30-60-90 → x, x√3, 2x\n45-45-90 → x, x, x√2\n\nThese show up constantly — knowing the triples saves huge time." },
+    { front: "SOHCAHTOA & Trig", back: "sin(θ) = Opposite / Hypotenuse\ncos(θ) = Adjacent / Hypotenuse\ntan(θ) = Opposite / Adjacent\n\nKey values:\nsin(30°)=½  cos(30°)=√3/2  tan(30°)=√3/3\nsin(45°)=√2/2  cos(45°)=√2/2  tan(45°)=1\nsin(60°)=√3/2  cos(60°)=½  tan(60°)=√3\n\nReciprocals: csc=1/sin, sec=1/cos, cot=1/tan" },
+    // ── Statistics & Probability (12-15%) ──
+    { front: "Statistics: Mean, Median, Mode", back: "Mean: sum of values ÷ number of values\nMedian: middle value when sorted (average middle two if even count)\nMode: most frequent value\n\nWeighted average: Σ(value × weight) / Σ(weights)\n\nACT tip: If they give you the mean and ask for a missing value, set up the equation:\n(sum of known values + x) / n = given mean" },
+    { front: "Probability Basics", back: "P(event) = favorable outcomes / total outcomes\n\nP(A or B) = P(A) + P(B) - P(A and B)\nP(A and B) = P(A) × P(B) if independent\n\nComplement: P(not A) = 1 - P(A)\n\nOn the ACT, always ask: Am I counting WITH replacement or WITHOUT?\nWith: probabilities stay the same\nWithout: total decreases each draw" },
+    // ── Number & Quantity (10-12%) ──
+    { front: "Percent, Ratio & Proportion", back: "Percent = (Part / Whole) × 100\nPercent change = ((New - Old) / Old) × 100\n\nProportions: a/b = c/d → cross multiply: ad = bc\n\nTip: 'of' means multiply, 'is' means equals\n30% of 80 = 0.30 × 80 = 24\n\nSuccessive percents: 20% off then 10% off ≠ 30% off!\nIt's 0.80 × 0.90 = 0.72 = 28% off" },
+    { front: "Enhanced ACT Math — Key Changes", back: "NEW FORMAT: 45 questions, 50 minutes (~67 sec each)\n\nBig changes:\n• Only 4 answer choices (was 5) — easier to eliminate!\n• More emphasis on modeling real-world scenarios\n• At least 20% modeling questions\n• ~9% are unscored field-test items\n\nContent: Number/Quantity 10-12%, Algebra 17-20%, Functions 17-20%, Geometry 17-20%, Stats/Prob 12-15%\n\nNo formulas provided — you MUST memorize them!" },
+  ],
+  reading: [
+    { front: "Enhanced ACT Reading — Format", back: "NEW FORMAT: 36 questions, 40 minutes (~67 sec each)\n\n4 passages total:\n• 3 standalone passages\n• 1 paired passage set\n• Each passage has 9 questions\n\nPassages are SHORTER than the old ACT.\n~9 questions are unscored field-test items.\n\nMore time per question than old format (67 sec vs. 52 sec) — use it wisely!" },
+    { front: "Main Idea Questions", back: "Look for: 'The passage primarily...' or 'The main purpose...'\n\nStrategy:\n1. Read first and last paragraphs carefully — main idea lives there\n2. Main idea is broader than any single detail\n3. Eliminate answers that are too specific (only about one paragraph)\n4. Eliminate answers that are too general or go beyond the passage\n5. Every paragraph should support the main idea" },
+    { front: "Inference Questions", back: "'It can be inferred...' or 'The passage suggests...'\n\nThe answer is implied, NOT directly stated — but it MUST be supported by evidence in the text.\n\n1. Identify what IS stated around the referenced lines\n2. Find the logical conclusion the author intended\n3. Avoid answers needing outside knowledge\n4. Avoid extreme inferences ('always,' 'never')\n5. The correct answer is usually a small logical step, not a big leap" },
+    { front: "Vocabulary in Context", back: "Strategy:\n1. Cover the target word and reread the sentence\n2. Predict a replacement word that fits the context\n3. Find the answer closest to your prediction\n\nContext > Dictionary definition!\n\nCommon trap: The most familiar definition is often WRONG.\nExample: 'charged' might mean 'filled with emotion,' not 'cost money.'\n'Arrest' might mean 'stop/catch attention,' not 'taken into custody.'" },
+    { front: "Author's Tone & Purpose", back: "Purpose types: inform, persuade, entertain, analyze, critique, celebrate\n\nTone vocabulary:\n• Positive: enthusiastic, reverent, nostalgic, optimistic, admiring\n• Negative: critical, cynical, skeptical, dismissive, sardonic\n• Neutral: objective, analytical, matter-of-fact, detached\n• Complex: ironic, ambivalent, bittersweet, wistful\n\nLook for: word choice (diction), what evidence is included/excluded, how the subject is described" },
+    { front: "Paired Passage Strategy", back: "Enhanced ACT always includes 1 paired set.\n\nStrategy:\n1. Read Passage A → answer A-specific questions\n2. Read Passage B → answer B-specific questions\n3. Answer comparison questions LAST\n\nComparison questions ask:\n• Where do authors agree/disagree?\n• How would Author A respond to Author B's claim?\n• What evidence from B supports/challenges A?\n\nKey: Identify each author's MAIN CLAIM and perspective first." },
+    { front: "Detail & Evidence Questions", back: "'According to the passage...' or 'Which lines best support...'\n\nThese answers ARE directly stated — don't infer!\n\nStrategy:\n1. Note the line reference or key words\n2. GO BACK to the passage and reread 2-3 sentences around it\n3. Match the answer to specific text\n4. Beware of 'true but not stated' answers — it must be IN the passage\n\nNever answer detail questions from memory." },
+    { front: "Eliminating Wrong Answers", back: "Common wrong answer types on ACT Reading:\n\n• Too extreme ('always,' 'never,' 'all,' 'none')\n• Too broad (main idea answer for a detail question)\n• Too narrow (detail answer for a main idea question)\n• Contradicts the passage\n• Requires outside knowledge\n• Half right, half wrong (partially correct but includes wrong info)\n• Right passage, wrong question (true info from passage but doesn't answer THIS question)\n\nWhen stuck between two: pick the one MORE directly supported by specific text." },
+    { front: "Reading Time Management", back: "40 minutes for 36 questions = ~10 min per passage+questions\n\nStrategy:\n• Skim passage first (3 min) — note main idea of each paragraph\n• Answer questions (7 min)\n• Do YOUR strongest passage type FIRST\n• Don't get stuck — mark and move on, come back later\n• Never leave anything blank — NO guessing penalty!\n\nFor the paired passage, budget 12 minutes since you're reading two texts." },
+  ],
+  science: [
+    { front: "Enhanced ACT Science — Now Optional!", back: "KEY CHANGE: Science is OPTIONAL on the Enhanced ACT.\n\n• 40 questions in 40 minutes (1 min each — more time than before!)\n• Scored 1-36 but reported SEPARATELY\n• Does NOT count toward your composite score\n• 7 passages total\n• Includes at least 1 engineering/design passage (NEW)\n• More questions requiring OUTSIDE science knowledge than before\n\nShould you take it? Many colleges still value it, and a strong Science score can strengthen your application." },
+    { front: "Data Representation", back: "Tests: Reading graphs, tables, and figures\n\nStrategy:\n1. Read title and axis labels FIRST\n2. Identify units and scale\n3. Look for trends (increasing, decreasing, constant, cyclical)\n4. Most answers are directly IN the data — just read carefully\n\nCommon question types:\n• 'At what point does X equal Y?'\n• 'What is the trend between variables?'\n• 'According to Table 1, what value...'" },
+    { front: "Research Summaries", back: "Multiple related experiments with questions about methods, results, and conclusions.\n\nKey terms:\n• Independent variable: what scientist changes\n• Dependent variable: what is measured\n• Control variables: kept constant\n• Control group: receives no treatment\n\nStrategy: Before answering, understand EACH experiment's purpose — what was it testing? How did it differ from the other experiments?" },
+    { front: "Conflicting Viewpoints", back: "2-3 scientists/students present different explanations for the same phenomenon.\n\nStrategy:\n1. Read ALL viewpoints BEFORE answering anything\n2. Identify each person's MAIN CLAIM in one sentence\n3. Note what EVIDENCE each uses\n4. Find where they AGREE and DISAGREE\n\nCommon questions:\n• 'Which scientist would agree with...?'\n• 'What new evidence would weaken Scientist 2's claim?'\n• 'On what point do both scientists agree?'" },
+    { front: "DRY MIX — Variables", back: "D = Dependent | R = Responding | Y = Y-axis\nM = Manipulated | I = Independent | X = X-axis\n\nIndependent: what the scientist CHANGES (x-axis)\nDependent: what is MEASURED as a result (y-axis)\nControl: variables kept CONSTANT for a fair test\n\nExample: Testing how fertilizer affects plant growth\n• Independent: amount of fertilizer\n• Dependent: plant height\n• Controls: water, sunlight, soil type, pot size" },
+    { front: "Reading Graphs & Identifying Trends", back: "Direct/positive: As x ↑, y ↑ (upward slope)\nInverse/negative: As x ↑, y ↓ (downward slope)\nNo relationship: scattered data, no pattern\n\nGraph types:\n• Line graph: continuous trends over time/quantity\n• Bar graph: comparing discrete categories\n• Scatter plot: showing correlation between variables\n\nAlways check: axis scale, units, legend, error bars, whether axes start at zero" },
+    { front: "Outside Knowledge Questions (NEW emphasis)", back: "Enhanced ACT Science now includes MORE questions requiring basic science knowledge.\n\nTopics to know:\n• Cell biology: mitosis, DNA, photosynthesis, respiration\n• Chemistry: pH scale, states of matter, atomic structure\n• Physics: Newton's laws, speed/velocity/acceleration, energy\n• Earth science: plate tectonics, weather, climate\n• Engineering/design concepts (new!)\n\nThese are basic concepts — not advanced science. Think 'intro bio/chem/physics' level." },
+    { front: "Scientific Method on the ACT", back: "1. Observation / Question\n2. Hypothesis ('If...then...' — must be testable)\n3. Experiment Design\n4. Data Collection\n5. Analysis\n6. Conclusion\n\nACT asks:\n• 'What is the hypothesis?'\n• 'How could this experiment be improved?'\n• 'What conclusion does the data support?'\n• 'What additional experiment would test...?'\n\nA good experiment changes ONLY ONE variable at a time." },
+    { front: "Science Time Strategy", back: "40 min ÷ 40 questions = 1 minute each\n\nThis is MORE time per question than the old ACT!\n\nOrder of difficulty:\n1. Data Representation (easiest — do first)\n2. Research Summaries (moderate)\n3. Conflicting Viewpoints (most reading — do last)\n\nTips:\n• Don't read every word of the passage — go to the data first\n• Skip hard questions — mark and return\n• Never leave blank — no guessing penalty!" },
+  ],
+  writing: [
+    { front: "ACT Essay Structure (5 paragraphs)", back: "1. Introduction: Hook, present topic, state thesis\n2. Body ¶1: Your perspective + analyze Perspective 1\n3. Body ¶2: Analyze Perspective 2\n4. Body ¶3: Analyze Perspective 3\n5. Conclusion: Restate thesis, broader significance\n\nGoal: 40 minutes, ~400-500 words" },
+    { front: "The Three Perspectives", back: "ACT gives 3 perspectives on a complex issue.\n\nYou must:\n1. State YOUR OWN clear perspective\n2. Discuss each given perspective\n3. Explain how they relate to yours\n4. Use reasoning and examples\n\nYou DON'T have to agree with any of them!" },
+    { front: "Scoring (2-12 scale)", back: "4 domains scored by two readers:\n1. Ideas & Analysis — depth, insight\n2. Development & Support — evidence, reasoning\n3. Organization — structure, transitions\n4. Language Use — vocab, grammar, variety\n\nEach reader scores 1-6 per domain\nFinal = average across domains" },
+    { front: "Strong Thesis Statement", back: "A good thesis:\n✓ Takes a clear position\n✓ Acknowledges complexity\n✓ Previews your argument\n\nTemplate:\n'Although [counterpoint], [position] because [reason].'\n\n✗ 'There are pros and cons.'\n✓ 'While technology enhances productivity, its threat to connection demands clear boundaries.'" },
+    { front: "Transitions for Essays", back: "Between ¶s: Furthermore, In contrast, However, Similarly\nEvidence: For instance, Specifically, Consider\nAnalysis: This demonstrates, This reveals, This suggests\nConclusion: Ultimately, In conclusion, Taken together\n\nAvoid starting ¶s with 'I' or 'Also'" },
+    { front: "Types of Evidence", back: "Strong evidence:\n1. Specific examples (historical events, discoveries)\n2. Hypothetical scenarios (if...then)\n3. Personal experience (sparingly)\n4. Logical reasoning (cause-effect)\n\nBe SPECIFIC:\n✗ 'Technology changed society'\n✓ 'The printing press democratized knowledge'" },
+  ],
+};
+
+const QUESTIONS = {
+  english: [
+    { id: 1, context: "The new community center, which opened last spring, quickly became popular. Visitors can use the gym, attend classes, or [BLANK] art workshops.", question: "Which choice correctly fills the blank?", choices: ["A. enjoying", "B. to enjoy", "C. enjoy", "D. enjoyed"], answer: 2, explanation: "Parallel structure: the list uses base verbs ('use' and 'attend'), so the third item should also be a base verb: 'enjoy.'" },
+    { id: 2, question: "Which sentence contains a dangling modifier?", choices: ["A. After finishing the report, Maria submitted it.", "B. Running to catch the bus, her bag slipped off.", "C. Having studied all night, Jake felt confident.", "D. While eating lunch, Sarah read her book."], answer: 1, explanation: "'Running to catch the bus' implies someone was running, but 'her bag' is the subject — bags can't run. This is a dangling modifier." },
+    { id: 3, question: "Choose the correct apostrophe usage:", choices: ["A. The student's performed well on their test's.", "B. The students performed well on their tests.", "C. The student's performed well on there tests.", "D. The students' performed well on their test's."], answer: 1, explanation: "No apostrophes needed: 'students' and 'tests' are simple plurals, not possessives. 'their' is the correct possessive pronoun." },
+    { id: 4, question: "Fill the blank: 'The experiment had promising results. _______, the final data showed no effect.'", choices: ["A. Furthermore", "B. Therefore", "C. However", "D. Similarly"], answer: 2, explanation: "'However' signals contrast between promising early results and disappointing final data." },
+    { id: 5, question: "Which sentence is punctuated correctly?", choices: ["A. I wanted to go, however, I had homework.", "B. I wanted to go; however, I had homework.", "C. I wanted to go however, I had homework.", "D. I wanted to go, however I had homework."], answer: 1, explanation: "When 'however' connects two independent clauses: semicolon before, comma after. [clause]; however, [clause]." },
+    { id: 6, question: "Which revision improves this sentence? 'The report was thorough, detailed, and had impressive citations.'", choices: ["A. thorough, detailed, and impressively cited", "B. thorough and detailed and had citations", "C. thorough, detailed, having impressive citations", "D. No change needed"], answer: 0, explanation: "Parallel structure: 'thorough' and 'detailed' are adjectives, so the third item should also be an adjective phrase: 'impressively cited.'" },
+  ],
+  math: [
+    { id: 1, question: "If 4x - 3 = 17, what is x?", choices: ["A. 3.5", "B. 4", "C. 5", "D. 6"], answer: 2, explanation: "4x - 3 = 17 → 4x = 20 → x = 5. Inverse operations: add 3 to both sides, then divide by 4." },
+    { id: 2, question: "What is the slope of the line through (-1, 4) and (3, -4)?", choices: ["A. -2", "B. -½", "C. ½", "D. 2"], answer: 0, explanation: "m = (y₂-y₁)/(x₂-x₁) = (-4-4)/(3-(-1)) = -8/4 = -2." },
+    { id: 3, question: "A right triangle has legs of length 5 and 12. What is the hypotenuse?", choices: ["A. 11", "B. 13", "C. 15", "D. 17"], answer: 1, explanation: "5² + 12² = 25 + 144 = 169 → c = √169 = 13. This is a 5-12-13 Pythagorean triple — memorize it!" },
+    { id: 4, question: "A population of bacteria doubles every 3 hours. If there are 500 bacteria at noon, how many are there at 9 PM?", choices: ["A. 1,500", "B. 2,000", "C. 4,000", "D. 8,000"], answer: 2, explanation: "From noon to 9 PM = 9 hours. 9÷3 = 3 doublings. 500 → 1000 → 2000 → 4000. This is exponential growth: 500 × 2³ = 4000." },
+    { id: 5, question: "Solve: |3x - 6| = 9", choices: ["A. x = -1 or x = 5", "B. x = 1 or x = 5", "C. x = -1 only", "D. x = 5 only"], answer: 0, explanation: "3x - 6 = 9 → x = 5. OR 3x - 6 = -9 → x = -1. Absolute value equations always have TWO cases." },
+    { id: 6, question: "A store marks a $80 jacket 25% off, then takes an additional 10% off the sale price. What is the final price?", choices: ["A. $48.00", "B. $52.00", "C. $54.00", "D. $56.00"], answer: 2, explanation: "25% off $80 = $80 × 0.75 = $60. Then 10% off $60 = $60 × 0.90 = $54. Note: 25% + 10% ≠ 35% off! Successive discounts multiply, they don't add." },
+    { id: 7, question: "If f(x) = 2x² - 3x + 1, what is f(3)?", choices: ["A. 8", "B. 10", "C. 12", "D. 16"], answer: 1, explanation: "f(3) = 2(3²) - 3(3) + 1 = 2(9) - 9 + 1 = 18 - 9 + 1 = 10. Substitute 3 for every x." },
+    { id: 8, question: "The mean of 5 test scores is 82. If four of the scores are 78, 85, 90, and 76, what is the fifth score?", choices: ["A. 79", "B. 81", "C. 82", "D. 84"], answer: 1, explanation: "Mean = sum ÷ count. So sum = 82 × 5 = 410. Known sum: 78+85+90+76 = 329. Fifth score: 410 - 329 = 81." },
+  ],
+  reading: [
+    { id: 1, context: "The old lighthouse keeper had watched the harbor for forty years. When asked if he ever felt lonely, he smiled: 'The sea is the best companion — it never expects anything of you.'", question: "The keeper's attitude toward his work is best described as:", choices: ["A. Resentful and bitter", "B. Peaceful and accepting", "C. Anxious and uncertain", "D. Eager and competitive"], answer: 1, explanation: "His smile and calling the sea a 'best companion' shows contentment with solitude — peaceful and accepting." },
+    { id: 2, context: "Despite being first dismissed as fringe theory, plate tectonics is now the cornerstone of modern geology.", question: "'Cornerstone' most nearly means:", choices: ["A. Literal stone", "B. Outdated idea", "C. Fundamental basis", "D. Controversial claim"], answer: 2, explanation: "In context, 'cornerstone' means the foundational basis upon which modern geology is built." },
+    { id: 3, context: "'For all the efficiency of digital communication, something essential is lost when we replace conversation with a screen. Nuance, tone, the raised eyebrow — these are the vocabulary of connection that no emoji can fully capture.'", question: "The author's primary purpose is to:", choices: ["A. Argue digital communication should be banned", "B. Explain how emojis were invented", "C. Suggest digital communication has limitations", "D. Compare speeds of communication methods"], answer: 2, explanation: "The author acknowledges efficiency but highlights what's lost — pointing to limitations, not calling for a ban." },
+    { id: 4, context: "The researcher spent three decades documenting vanishing languages, racing against time as speakers aged and communities dispersed. Her work, she insisted, was not about nostalgia but necessity.", question: "The researcher views her work primarily as:", choices: ["A. A personal hobby", "B. An urgent practical endeavor", "C. A nostalgic exercise", "D. An academic formality"], answer: 1, explanation: "She explicitly distinguishes her work from 'nostalgia' and calls it 'necessity,' emphasizing urgency ('racing against time')." },
+  ],
+  science: [
+    { id: 1, context: "Plant photosynthesis at different light levels:\nLight (lux): 100, 200, 400, 800, 1600\nO₂ (mL/hr): 2, 4, 8, 12, 14", question: "What happens to photosynthesis as light increases from 100 to 1600 lux?", choices: ["A. Rate decreases steadily", "B. Rate increases constantly", "C. Rate increases then levels off", "D. Rate stays the same"], answer: 2, explanation: "O₂ jumps from 2→4→8→12 (rapid), then 12→14 (slowing). The rate is leveling off at high light — light saturation." },
+    { id: 2, context: "A scientist adds different amounts of salt to water and measures boiling point. Water amount, pot, heat, and altitude are constant.", question: "What is the independent variable?", choices: ["A. Amount of water", "B. Amount of salt added", "C. Boiling point", "D. Heat source temperature"], answer: 1, explanation: "Independent variable = what the scientist changes. She varies salt amount. Boiling point is the dependent variable (measured)." },
+    { id: 3, context: "Scientist A: Asteroid impact caused mass extinction by blocking sunlight.\nScientist B: Volcanic eruptions (Deccan Traps) caused gradual climate change.", question: "Which MOST supports Scientist A?", choices: ["A. Fossil records showing gradual decline", "B. Volcanic activity on multiple continents", "C. Global iridium layer at the extinction boundary", "D. Long-term ocean temperature changes"], answer: 2, explanation: "Iridium is rare on Earth but common in asteroids. A global layer at exactly the extinction boundary = strong asteroid evidence." },
+    { id: 4, context: "Students tested how temperature affects enzyme activity:\nTemp (°C): 10, 20, 30, 40, 50, 60\nRate: 5, 12, 25, 38, 20, 3", question: "At what temperature is enzyme activity highest?", choices: ["A. 10°C", "B. 30°C", "C. 40°C", "D. 60°C"], answer: 2, explanation: "The data shows rate peaks at 40°C (38) then drops at 50° and 60° — classic enzyme activity curve with an optimal temperature." },
+  ],
+};
+
+const ESSAY_PROMPTS = [
+  { title: "Technology and Human Connection", topic: "As technology becomes integrated into daily life, some argue it brings people closer while others contend it creates distance.", perspectives: ["Technology enhances connection by eliminating distance and enabling instant global communication.", "Technology replaces genuine connection with shallow digital substitutes, leaving people more isolated.", "Technology is neutral — whether it helps or hinders connection depends on how individuals use it."] },
+  { title: "AI in Education", topic: "Artificial intelligence tools are rapidly entering classrooms. Consider the implications.", perspectives: ["AI personalized learning is the biggest advancement since the printing press.", "Relying on AI undermines critical thinking and problem-solving skills students need.", "The key is teacher oversight — AI should enhance, not replace, human educators."] },
+  { title: "Automation and Work", topic: "Automation is transforming the economy by replacing jobs. How should society respond?", perspectives: ["Automation creates more jobs than it destroys — embrace the change.", "Without policy intervention, automation will devastate working-class communities.", "Focus on education and retraining to prepare workers for new jobs automation creates."] },
+];
+
+// ═══════════════════════════════════════════════════════════
+// ACT GUIDE DATA
+// ═══════════════════════════════════════════════════════════
+
+const GUIDE_SECTIONS = [
+  { title: "Enhanced ACT Overview (2025-2026)", icon: "📋", content: "The Enhanced ACT launched in 2025. It's SHORTER and has major structural changes.\n\n3 REQUIRED sections (count toward composite):\n• English: 50 questions in 35 minutes\n• Math: 45 questions in 50 minutes\n• Reading: 36 questions in 40 minutes\n\n2 OPTIONAL sections (scored separately):\n• Science: 40 questions in 40 minutes\n• Writing: 1 essay in 40 minutes\n\nTotal required test time: ~2 hours 5 minutes (was 2h 55m).\n\nScoring: Each section scored 1-36. Composite = average of English + Math + Reading ONLY. Science and Writing scores are reported separately.\n\nOther changes: Math now has 4 answer choices instead of 5. All English questions now have question stems. Passages in Reading are shorter. Science has more outside-knowledge questions and at least one engineering/design passage.\n\nAverage ACT score: ~20. Score of 30+ = top 5-7%." },
+  { title: "English Strategy", icon: "📝", content: "Pacing: 35 min ÷ 50 questions = 42 seconds each.\n\nBIG SHIFT on Enhanced ACT: More rhetoric and language questions, fewer pure grammar.\n• Production of Writing: 38-43% (organization, purpose, strategy)\n• Knowledge of Language: 38-43% (style, tone, precision, conciseness)\n• Conventions of Standard English: 14-24% (grammar, punctuation)\n\nTop strategies:\n• All questions now have QUESTION STEMS — read them! They tell you what skill is being tested.\n• Re-read the FULL sentence with your answer. If it sounds off, it probably is.\n• The shortest grammatically correct answer is often right — ACT rewards conciseness.\n• Watch for redundancy: 'past history,' 'collaborate together' = always wrong.\n• For 'add/delete' questions: Does the sentence support the paragraph's MAIN POINT?\n• For placement questions: Look for pronoun references and logical flow.\n• ~10 questions are unscored field-test items (you won't know which)." },
+  { title: "Math Strategy", icon: "🔢", content: "Pacing: 50 min ÷ 45 questions = ~67 seconds each. Questions go easy → hard.\n\nKey changes: Only 4 answer choices now (easier to eliminate!). More modeling/real-world questions (at least 20%).\n\nContent: Algebra 17-20%, Functions 17-20%, Geometry 17-20%, Stats/Prob 12-15%, Number/Quantity 10-12%\n\nTop strategies:\n• Use your calculator wisely but don't over-rely on it.\n• Backsolve: plug answer choices INTO the problem — works great with only 4 options.\n• Draw diagrams for geometry problems without figures.\n• Estimate to eliminate clearly impossible answers.\n• Easy questions = same points as hard ones. Don't skip easy ones for hard ones.\n• MEMORIZE formulas — none are provided on the ACT.\n• With 4 choices, random guessing gives you 25% — always guess if stuck." },
+  { title: "Reading Strategy", icon: "📚", content: "Pacing: 40 min ÷ 4 passages = 10 min per passage (read + answer).\n\nFormat: 3 standalone passages + 1 paired set, 9 questions each. Passages are shorter than before!\n\nTop strategies:\n• Do your strongest passage type FIRST to bank confidence.\n• Skim passage first (3 min) — note the main idea of each paragraph.\n• For detail questions, ALWAYS go back to the passage. Never answer from memory.\n• For inference questions: the answer must be supported by specific text.\n• Process of elimination: cross out wrong answers before choosing.\n• Stuck between two? Pick the one more directly supported by specific text.\n• Budget extra time (~12 min) for the paired passage.\n• Don't bring outside knowledge — everything you need is in the passage.\n• ~9 questions are unscored field-test items." },
+  { title: "Science Strategy (Optional Section)", icon: "🔬", content: "Pacing: 40 min ÷ 40 questions = 1 minute each (more time than old ACT!).\n\nScience is NOW OPTIONAL. Your score is reported separately and does NOT affect your composite.\n\nShould you take it? If you're strong in science, it can boost your application. Many colleges still value it.\n\nKey changes: More questions require OUTSIDE science knowledge. At least 1 passage on engineering/design.\n\nTop strategies:\n• Most questions STILL test data reading, not deep science knowledge.\n• Read axis labels, titles, and units BEFORE the questions.\n• For conflicting viewpoints, read ALL viewpoints before answering.\n• Do passages in order: Data Representation → Research Summaries → Conflicting Viewpoints.\n• For outside-knowledge questions: brush up on basic bio, chem, physics, and earth science concepts.\n• Don't read every word of text — go to the figures/data first.\n• Never leave blank — no guessing penalty!" },
+  { title: "Writing (Essay) Strategy", icon: "✍️", content: "Time: 40 minutes for one analytical essay. Also optional — scored 2-12 separately.\n\nFew colleges require the essay anymore, but some still accept it for scholarship consideration.\n\nTime management:\n• Planning: 5 minutes\n• Writing: 30 minutes\n• Reviewing: 5 minutes\n\nTop strategies:\n• You get a topic with THREE perspectives. You MUST address all three.\n• Take a CLEAR stance — wishy-washy essays score lower.\n• Use specific examples (historical events, current events, personal experience).\n• Aim for 4-5 paragraphs and 400-500 words.\n• Strong transitions between paragraphs boost your Organization score.\n• End with a conclusion that goes beyond restating your thesis.\n\nScored on 4 domains by 2 readers: Ideas & Analysis, Development & Support, Organization, Language Use." },
+  { title: "Test Day Tips", icon: "🎯", content: "Before the test:\n• Get 8+ hours of sleep the night before.\n• Eat a solid breakfast with protein.\n• Arrive 30 minutes early.\n• Bring: photo ID, admission ticket, #2 pencils (not mechanical), approved calculator with fresh batteries, watch (no smartwatch), water and snacks.\n\nDuring the test:\n• The Enhanced ACT is shorter — but stay focused for every section.\n• Bubble as you go — don't save for the end.\n• NEVER leave a question blank — there's NO guessing penalty.\n• With 4 answer choices on math, you have a 25% chance even guessing randomly.\n• Use your watch to pace yourself at the start of each section.\n• During breaks: snack, stretch, restroom.\n\nMental game:\n• Stay positive. One hard section doesn't ruin your score.\n• If you zone out, take 3 deep breaths and refocus.\n• Remember: composite is only 3 sections now — each one matters more!" },
+  { title: "Score Improvement Plan", icon: "📈", content: "Week-by-week plan:\n\nWeeks 1-2: Diagnostic\n• Take a full Enhanced ACT practice test (available free on act.org).\n• Identify your weakest of the 3 required sections.\n• Review every wrong answer — understand WHY you got it wrong.\n\nWeeks 3-6: Targeted Practice\n• Spend 60% of study time on your weakest section.\n• Use flashcards daily (even 10 min helps).\n• Do TIMED practice sets — pacing is crucial.\n• Keep a 'wrong answer journal' — track patterns in your mistakes.\n\nWeeks 7-8: Full Practice Tests\n• Take 2-3 full tests under real conditions.\n• Simulate test day (early morning, timed breaks).\n• Focus on pacing — finishing each section is critical.\n\nTest week:\n• Light review only.\n• Review flashcards and wrong answer journal.\n• Get plenty of sleep.\n• Trust your preparation!\n\nKey insight: Since composite is now only 3 sections, each section matters MORE. Improving your weakest section gives the biggest score boost.\n\nFree official practice: act.org offers free practice tests, daily questions (QuizMe), and the 'Preparing for the ACT 2025-2026' guide PDF." },
+];
+
+// ═══════════════════════════════════════════════════════════
+// CHATBOT KNOWLEDGE BASE
+// ═══════════════════════════════════════════════════════════
+
+const CHATBOT_KB = [
+  { keys: ["slope", "line"], reply: "📐 **Slope Formula:** m = (y₂ - y₁) / (x₂ - x₁)\n\n**Line Forms:**\n• Slope-intercept: y = mx + b\n• Point-slope: y - y₁ = m(x - x₁)\n• Standard: Ax + By = C\n\nParallel lines = same slope. Perpendicular = negative reciprocal slopes.\n\nNeed me to calculate a specific slope? Just type two points like: slope (2,3) (5,9)" },
+  { keys: ["quadratic", "formula"], reply: "📐 **Quadratic Formula:**\nx = (-b ± √(b² - 4ac)) / 2a\n\nFor ax² + bx + c = 0\n\nThe discriminant (b² - 4ac) tells you:\n• Positive → 2 real solutions\n• Zero → 1 real solution\n• Negative → no real solutions\n\nWant me to solve a specific quadratic? Type it like: solve x^2 + 5x + 6 = 0" },
+  { keys: ["pythagorean", "right triangle", "hypotenuse"], reply: "📐 **Pythagorean Theorem:** a² + b² = c²\n\nCommon triples to memorize: 3-4-5, 5-12-13, 8-15-17, 7-24-25\n(Multiples work too: 6-8-10, 9-12-15)\n\n**Special Right Triangles:**\n• 30-60-90 → sides: x, x√3, 2x\n• 45-45-90 → sides: x, x, x√2\n\nGive me two sides and I'll find the third!" },
+  { keys: ["area", "circle", "circumference", "perimeter"], reply: "📐 **Area Formulas:**\n• Circle: A = πr², C = 2πr\n• Triangle: A = ½bh\n• Rectangle: A = lw, P = 2l + 2w\n• Trapezoid: A = ½(b₁ + b₂)h\n• Parallelogram: A = bh\n\nTell me the shape and dimensions and I'll calculate it!" },
+  { keys: ["sohcahtoa", "trig", "sin", "cos", "tan"], reply: "📐 **SOHCAHTOA:**\nsin θ = Opposite / Hypotenuse\ncos θ = Adjacent / Hypotenuse\ntan θ = Opposite / Adjacent\n\n**Key values:**\nsin(30°) = 0.5, cos(30°) ≈ 0.866\nsin(45°) ≈ 0.707, cos(45°) ≈ 0.707\nsin(60°) ≈ 0.866, cos(60°) = 0.5\n\nI can calculate trig values! Try: sin(45), cos(60), etc." },
+  { keys: ["comma", "punctuation", "semicolon"], reply: "📝 **Comma Rules for ACT:**\n1. Before FANBOYS joining independent clauses\n2. After introductory phrases/clauses\n3. Around non-essential (nonrestrictive) clauses\n4. Between items in a list\n\n**Semicolon:** Joins two independent clauses.\n**Colon:** Introduces a list/explanation (needs independent clause before it).\n\nRemember: [clause]; however, [clause]" },
+  { keys: ["grammar", "english", "subject", "verb"], reply: "📝 **Key ACT English Rules:**\n1. Subject-verb agreement (ignore phrases between them)\n2. Pronoun-antecedent agreement\n3. Parallel structure in lists\n4. No comma splices\n5. Correct apostrophe use\n6. Proper modifier placement\n7. Conciseness (shortest correct answer often wins)\n\nWhat specific grammar rule do you need help with?" },
+  { keys: ["reading", "passage", "comprehension"], reply: "📚 **ACT Reading Strategy:**\n1. Skim passage first (2-3 min)\n2. Note main idea of each paragraph\n3. Answer questions (5-6 min)\n4. ALWAYS go back to passage for detail Qs\n5. Use process of elimination\n\n**Passage order:** Literary Narrative → Social Science → Humanities → Natural Science\n\nDo your strongest passage type FIRST!" },
+  { keys: ["science", "data", "graph", "experiment"], reply: "🔬 **ACT Science Strategy:**\n• Most questions DON'T need outside science knowledge\n• Read axes labels, titles, and units first\n• Focus on trends in the data\n• For conflicting viewpoints, read ALL before answering\n\n**Order of difficulty:**\n1. Data Representation (easiest)\n2. Research Summaries\n3. Conflicting Viewpoints (hardest)" },
+  { keys: ["essay", "writing", "thesis", "persuasive"], reply: "✍️ **ACT Essay Structure:**\n1. Intro: Hook + thesis (your clear position)\n2. Body 1: Your view + Perspective 1\n3. Body 2: Analyze Perspective 2\n4. Body 3: Analyze Perspective 3\n5. Conclusion: Restate + broader significance\n\nAim for 400-500 words. ALWAYS address all 3 perspectives!\n\nWant to practice? I can give you a sample prompt!" },
+  { keys: ["score", "good score", "average", "composite"], reply: "📊 **Enhanced ACT Scoring (2025-2026):**\n• Each section: 1-36\n• Composite = average of English + Math + Reading ONLY\n• Science & Writing scored separately (don't affect composite)\n• National average: ~20\n• 25+ = above average (75th percentile)\n• 30+ = excellent (top 5-7%)\n• 34+ = elite (top 1%)\n\n**Score goals by college type:**\n• Community college: 18-22\n• State universities: 22-27\n• Competitive schools: 28-32\n• Ivy League/elite: 33-36" },
+  { keys: ["time", "timing", "pace", "manage"], reply: "⏱ **Enhanced ACT Timing:**\n• English: 42 sec/question (50 Qs, 35 min)\n• Math: 67 sec/question (45 Qs, 50 min)\n• Reading: 10 min/passage (36 Qs, 40 min)\n• Science (optional): 60 sec/question (40 Qs, 40 min)\n• Writing (optional): 40 min total\n\nTotal required time: ~2 hours 5 min (shorter than old ACT!)\n\n**Tips:** Wear a watch! Set mini-deadlines per passage/section." },
+  { keys: ["calculator", "allowed", "bring"], reply: "🧮 **ACT Calculator Policy:**\nAllowed: Most graphing and scientific calculators (TI-84, TI-Nspire non-CAS)\n\nNOT allowed: Calculators with CAS (computer algebra systems), phones, tablets\n\n**Tips:**\n• Bring fresh batteries\n• Know YOUR calculator well\n• Many problems are faster by hand\n• Calculator is only for the Math section" },
+  { keys: ["guess", "guessing", "blank", "skip"], reply: "🎯 **Guessing Strategy:**\nThere is NO guessing penalty on the ACT! Never leave a question blank.\n\n**Smart guessing:**\n1. Eliminate obviously wrong answers first\n2. If you can eliminate even 1 choice, guess from remaining\n3. If totally stuck, pick a letter and use it consistently\n4. Mark skipped questions so you can return\n\nGuessing between 2 answers = 50% chance. That adds up!" },
+  { keys: ["help", "what can you", "commands"], reply: "🤖 **I can help you with:**\n\n🔢 **Math:** Type any expression to solve it!\n• Examples: 2^8, sqrt(144), sin(45 deg), 15% of 230\n• I know all ACT math formulas\n\n📝 **English:** Grammar rules, comma usage, transitions\n\n📚 **Reading:** Passage strategies, question types\n\n🔬 **Science:** Data analysis, experimental design\n\n✍️ **Writing:** Essay structure, thesis help\n\n📊 **General:** Scoring, timing, test day tips\n\nJust ask me anything!" },
+];
+
+// ═══════════════════════════════════════════════════════════
+// CHATBOT LOGIC
+// ═══════════════════════════════════════════════════════════
+
+function chatbotRespond(input) {
+  const lower = input.toLowerCase().trim();
+  if (!lower) return "Type a question or math expression and I'll help!";
+
+  // Try math evaluation
+  try {
+    const cleaned = input
+      .replace(/what is /i, "")
+      .replace(/calculate /i, "")
+      .replace(/solve /i, "")
+      .replace(/evaluate /i, "")
+      .replace(/(\d+)% of (\d+)/i, "($1/100)*$2")
+      .replace(/x/g, "*")
+      .replace(/÷/g, "/")
+      .trim();
+    if (/^[\d\s+\-*/().^sqrtincoatelpgb,]+$/i.test(cleaned) || /^\d/.test(cleaned)) {
+      const result = math.evaluate(cleaned);
+      if (typeof result === "number" || typeof result === "object") {
+        const display = typeof result === "number" ? (Number.isInteger(result) ? result : math.round(result, 6)) : result.toString();
+        return `🧮 **Result:** ${display}\n\nWant me to explain how to solve this step by step?`;
+      }
+    }
+  } catch (e) { /* not a math expression, continue */ }
+
+  // Try specific computations
+  const slopeMatch = lower.match(/slope.*?(-?\d+)[,\s]+(-?\d+).*?(-?\d+)[,\s]+(-?\d+)/);
+  if (slopeMatch) {
+    const [, x1, y1, x2, y2] = slopeMatch.map(Number);
+    const slope = (y2 - y1) / (x2 - x1);
+    return `📐 **Slope between (${x1}, ${y1}) and (${x2}, ${y2}):**\nm = (${y2} - ${y1}) / (${x2} - ${x1}) = ${y2-y1} / ${x2-x1} = **${Number.isInteger(slope) ? slope : slope.toFixed(4)}**`;
+  }
+
+  const distMatch = lower.match(/distance.*?(-?\d+)[,\s]+(-?\d+).*?(-?\d+)[,\s]+(-?\d+)/);
+  if (distMatch) {
+    const [, x1, y1, x2, y2] = distMatch.map(Number);
+    const dist = Math.sqrt((x2-x1)**2 + (y2-y1)**2);
+    return `📐 **Distance between (${x1}, ${y1}) and (${x2}, ${y2}):**\nd = √[(${x2}-${x1})² + (${y2}-${y1})²] = √[${(x2-x1)**2} + ${(y2-y1)**2}] = √${(x2-x1)**2 + (y2-y1)**2} ≈ **${math.round(dist, 4)}**`;
+  }
+
+  // Knowledge base matching
+  let bestMatch = null;
+  let bestScore = 0;
+  for (const entry of CHATBOT_KB) {
+    const score = entry.keys.filter(k => lower.includes(k)).length;
+    if (score > bestScore) { bestScore = score; bestMatch = entry; }
+  }
+  if (bestMatch && bestScore > 0) return bestMatch.reply;
+
+  // Greeting
+  if (/^(hi|hello|hey|yo|sup|what'?s up)/.test(lower)) return "Hey there! 👋 I'm your ACT study buddy. Ask me anything — math problems, grammar rules, test strategies, or just type a math expression to solve it!\n\nType **help** to see everything I can do.";
+
+  // Encouragement
+  if (lower.includes("stressed") || lower.includes("nervous") || lower.includes("scared") || lower.includes("worried"))
+    return "💪 It's totally normal to feel that way before a big test. Here's what helps:\n\n1. **Focus on progress, not perfection.** Every practice question makes you better.\n2. **Break studying into small chunks** — 25 min study, 5 min break.\n3. **Celebrate small wins** — even getting one more question right is growth.\n4. **Sleep well** — your brain consolidates learning during sleep.\n\nYou've got this! The fact that you're studying puts you ahead. 🌟";
+
+  if (lower.includes("thank")) return "You're welcome! Keep up the great work. Every bit of practice counts! 🌟";
+
+  // Fallback
+  return "🤔 I'm not sure about that one, but I can help with:\n\n• **Math calculations** — type any expression (e.g., sqrt(64), 3^4)\n• **ACT strategies** — ask about any section\n• **Grammar rules** — comma usage, parallel structure, etc.\n• **Score info** — scoring, timing, test day tips\n\nTry rephrasing your question or type **help** for the full list!";
+}
+
+// ═══════════════════════════════════════════════════════════
+// COMPONENTS
+// ═══════════════════════════════════════════════════════════
+
+const glass = "backdrop-blur-xl bg-white/70 border border-white/40 shadow-lg";
+const glassHover = "hover:bg-white/80 hover:shadow-xl transition-all duration-300";
+
+function ProgressBar({ value, max, color = "#3B82F6" }) {
+  return (
+    <div className="w-full bg-white/30 rounded-full h-2 overflow-hidden backdrop-blur-sm">
+      <div className="h-2 rounded-full transition-all duration-500" style={{ width: `${Math.round((value / max) * 100)}%`, backgroundColor: color }} />
+    </div>
+  );
+}
+
+function FlipCard({ front, back, color }) {
+  const [flipped, setFlipped] = useState(false);
+  return (
+    <div className="w-full cursor-pointer select-none" style={{ perspective: "1200px", height: "300px" }} onClick={() => setFlipped(f => !f)}>
+      <div className="relative w-full h-full transition-transform duration-600" style={{ transformStyle: "preserve-3d", transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)", transitionDuration: "0.6s" }}>
+        <div className="absolute inset-0 rounded-2xl flex flex-col items-center justify-center p-8" style={{ backfaceVisibility: "hidden", background: `linear-gradient(135deg, ${color}15, ${color}05)`, border: `2px solid ${color}30`, backdropFilter: "blur(20px)" }}>
+          <div className="text-xs font-bold uppercase tracking-[0.2em] mb-5 opacity-50" style={{ color }}>Tap to reveal</div>
+          <div className="text-2xl font-bold text-center text-gray-800 leading-snug">{front}</div>
+          <div className="mt-6 text-sm text-gray-400 flex items-center gap-1">🔄 Click to flip</div>
+        </div>
+        <div className="absolute inset-0 rounded-2xl flex flex-col justify-center p-8 overflow-auto" style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)", background: `linear-gradient(135deg, ${color}, ${color}CC)`, color: "white" }}>
+          <div className="text-xs font-bold uppercase tracking-[0.2em] mb-4 opacity-70">Answer</div>
+          <div className="text-sm font-medium whitespace-pre-line leading-relaxed">{back}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODE COMPONENTS
+// ═══════════════════════════════════════════════════════════
+
+// Shuffle utility — Fisher-Yates algorithm
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function FlashcardsMode({ sectionKey }) {
+  const cards = FLASHCARDS[sectionKey] || [];
+  const [idx, setIdx] = useState(0);
+  const meta = SECTIONS[sectionKey];
+  if (!cards.length) return <div className="text-gray-400 text-center py-12">No flashcards yet.</div>;
+  return (
+    <div className="flex flex-col items-center gap-6">
+      <div className="text-sm text-gray-500 font-medium">Card {idx + 1} of {cards.length}</div>
+      <div className="w-full max-w-2xl"><FlipCard key={idx} front={cards[idx].front} back={cards[idx].back} color={meta.accent} /></div>
+      <ProgressBar value={idx + 1} max={cards.length} color={meta.accent} />
+      <div className="flex items-center gap-3">
+        <button onClick={() => setIdx(i => (i - 1 + cards.length) % cards.length)} className="px-5 py-2.5 rounded-xl font-semibold text-white shadow-md active:scale-95 transition-transform" style={{ backgroundColor: meta.accent }}>← Prev</button>
+        <button onClick={() => setIdx(Math.floor(Math.random() * cards.length))} className={`px-4 py-2.5 rounded-xl font-semibold shadow-md active:scale-95 transition-transform ${glass}`}>🔀 Shuffle</button>
+        <button onClick={() => setIdx(i => (i + 1) % cards.length)} className="px-5 py-2.5 rounded-xl font-semibold text-white shadow-md active:scale-95 transition-transform" style={{ backgroundColor: meta.accent }}>Next →</button>
+      </div>
+    </div>
+  );
+}
+
+function StudyNotesMode({ sectionKey }) {
+  const meta = SECTIONS[sectionKey];
+  const cards = FLASHCARDS[sectionKey] || [];
+  const [open, setOpen] = useState(null);
+  return (
+    <div className="max-w-2xl mx-auto flex flex-col gap-2">
+      <div className="text-sm text-gray-500 mb-2">{cards.length} topics — click to expand</div>
+      {cards.map((c, i) => (
+        <div key={i} className={`rounded-xl overflow-hidden ${glass}`}>
+          <button className="w-full flex justify-between items-center p-4 text-left font-semibold text-gray-800" onClick={() => setOpen(open === i ? null : i)}>
+            <span className="flex items-center gap-2"><span className="w-6 h-6 rounded-full text-xs flex items-center justify-center text-white font-bold" style={{ backgroundColor: meta.accent }}>{i + 1}</span>{c.front}</span>
+            <span className="text-lg" style={{ color: meta.accent }}>{open === i ? "−" : "+"}</span>
+          </button>
+          {open === i && <div className="px-4 pb-4 text-sm text-gray-700 whitespace-pre-line leading-relaxed" style={{ borderTop: `1px solid ${meta.accent}20` }}>{c.back}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function QuizMode({ sectionKey }) {
+  const pool = QUESTIONS[sectionKey] || [];
+  const meta = SECTIONS[sectionKey];
+  const [qs, setQs] = useState(() => shuffle(pool));
+  const [step, setStep] = useState("quiz");
+  const [idx, setIdx] = useState(0);
+  const [selected, setSelected] = useState(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [answers, setAnswers] = useState([]);
+
+  const reset = () => { setQs(shuffle(pool)); setStep("quiz"); setIdx(0); setSelected(null); setSubmitted(false); setAnswers([]); };
+  if (!qs.length) return <div className="text-gray-400 text-center py-12">No questions yet.</div>;
+
+  if (step === "results") {
+    const score = answers.filter(a => a.selected === a.correct).length;
+    const pct = Math.round((score / qs.length) * 100);
+    return (
+      <div className="max-w-lg mx-auto text-center flex flex-col items-center gap-5 py-4">
+        <div className="text-6xl">{pct >= 80 ? "🏆" : pct >= 60 ? "👍" : "📚"}</div>
+        <div className="text-3xl font-bold text-gray-800">{score} / {qs.length} <span className="text-lg font-normal text-gray-400">({pct}%)</span></div>
+        <ProgressBar value={score} max={qs.length} color={pct >= 80 ? "#10B981" : pct >= 60 ? "#F59E0B" : "#EF4444"} />
+        <p className="text-sm text-gray-500">{pct >= 80 ? "Excellent! You've mastered this material." : pct >= 60 ? "Good effort! Review the questions you missed." : "Keep studying — review flashcards and notes."}</p>
+        {answers.map((a, i) => (
+          <div key={i} className="w-full text-left rounded-xl p-4" style={{ backgroundColor: a.selected === a.correct ? "#ECFDF520" : "#FEF2F220", border: `1px solid ${a.selected === a.correct ? "#A7F3D0" : "#FECACA"}` }}>
+            <div className="text-xs font-bold mb-1" style={{ color: a.selected === a.correct ? "#10B981" : "#EF4444" }}>{a.selected === a.correct ? "✓ Correct" : "✗ Incorrect"}</div>
+            <div className="text-sm text-gray-700 font-medium">{qs[a.q].question}</div>
+            {a.selected !== a.correct && <div className="text-xs text-gray-500 mt-1">Your answer: {qs[a.q].choices[a.selected]} | Correct: {qs[a.q].choices[a.correct]}</div>}
+            <div className="text-xs text-gray-600 mt-2 italic">{qs[a.q].explanation}</div>
+          </div>
+        ))}
+        <button onClick={reset} className="px-8 py-3 rounded-xl font-semibold text-white shadow-md" style={{ backgroundColor: meta.accent }}>Retake Quiz</button>
+      </div>
+    );
+  }
+
+  const q = qs[idx];
+  return (
+    <div className="max-w-2xl mx-auto flex flex-col gap-5">
+      <div className="flex items-center gap-4"><span className="text-sm text-gray-500 shrink-0">Q{idx + 1}/{qs.length}</span><div className="flex-1"><ProgressBar value={idx} max={qs.length} color={meta.accent} /></div></div>
+      {q.context && <div className="rounded-xl p-4 text-sm text-gray-700 leading-relaxed italic" style={{ background: `${meta.accent}10`, borderLeft: `4px solid ${meta.accent}` }}>{q.context}</div>}
+      <div className="text-lg font-semibold text-gray-800">{q.question}</div>
+      <div className="flex flex-col gap-2.5">
+        {q.choices.map((c, i) => {
+          let style = {};
+          if (submitted && i === q.answer) style = { backgroundColor: "#ECFDF5", borderColor: "#34D399", color: "#065F46" };
+          else if (submitted && i === selected) style = { backgroundColor: "#FEF2F2", borderColor: "#F87171", color: "#991B1B" };
+          else if (i === selected) style = { backgroundColor: meta.accent, borderColor: meta.accent, color: "white" };
+          else style = { backgroundColor: "white", borderColor: "#E5E7EB" };
+          return <button key={i} onClick={() => !submitted && setSelected(i)} className="rounded-xl p-3.5 border-2 text-left font-medium transition-all text-sm" style={style}>{c}</button>;
+        })}
+      </div>
+      {submitted && <div className={`rounded-xl p-4 text-sm leading-relaxed ${glass}`} style={{ borderLeft: `4px solid ${meta.accent}` }}><span className="font-semibold">Explanation: </span>{q.explanation}</div>}
+      {!submitted
+        ? <button onClick={() => { if (selected !== null) { setSubmitted(true); setAnswers(p => [...p, { q: idx, selected, correct: q.answer }]); }}} disabled={selected === null} className="py-3 rounded-xl font-semibold text-white shadow-md disabled:opacity-40 transition" style={{ backgroundColor: meta.accent }}>Check Answer</button>
+        : <button onClick={() => { if (idx + 1 >= qs.length) setStep("results"); else { setIdx(i => i + 1); setSelected(null); setSubmitted(false); }}} className="py-3 rounded-xl font-semibold text-white shadow-md transition" style={{ backgroundColor: meta.accent }}>{idx + 1 >= qs.length ? "See Results" : "Next Question →"}</button>
+      }
+    </div>
+  );
+}
+
+function EssayPracticeMode() {
+  const [promptIdx, setPromptIdx] = useState(0);
+  const [essay, setEssay] = useState("");
+  const [timer, setTimer] = useState(40 * 60);
+  const [running, setRunning] = useState(false);
+  const ref = useRef(null);
+  const prompt = ESSAY_PROMPTS[promptIdx];
+
+  useEffect(() => {
+    if (running && timer > 0) ref.current = setInterval(() => setTimer(t => t - 1), 1000);
+    else clearInterval(ref.current);
+    return () => clearInterval(ref.current);
+  }, [running, timer]);
+
+  const mins = String(Math.floor(timer / 60)).padStart(2, "0");
+  const secs = String(timer % 60).padStart(2, "0");
+  const reset = () => { setTimer(40 * 60); setRunning(false); setEssay(""); };
+
+  return (
+    <div className="max-w-3xl mx-auto flex flex-col gap-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <select value={promptIdx} onChange={e => { setPromptIdx(+e.target.value); reset(); }} className="border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white/70 backdrop-blur">{ESSAY_PROMPTS.map((p, i) => <option key={i} value={i}>{p.title}</option>)}</select>
+        <div className="px-4 py-2 rounded-xl font-mono text-lg font-bold" style={{ backgroundColor: timer < 300 ? "#FEE2E2" : "#F0FDF4", color: timer < 300 ? "#EF4444" : "#10B981" }}>⏱ {mins}:{secs}</div>
+        <button onClick={() => setRunning(r => !r)} className="px-4 py-2 rounded-xl font-semibold text-white text-sm" style={{ backgroundColor: running ? "#F59E0B" : "#10B981" }}>{running ? "⏸ Pause" : "▶ Start"}</button>
+        <button onClick={reset} className={`px-4 py-2 rounded-xl font-semibold text-gray-700 text-sm ${glass}`}>↺ Reset</button>
+      </div>
+      <div className="rounded-xl p-5 border border-amber-200/50 bg-amber-50/50 backdrop-blur">
+        <div className="font-bold text-lg text-gray-800 mb-2">{prompt.title}</div>
+        <div className="text-sm text-gray-700 mb-4">{prompt.topic}</div>
+        {prompt.perspectives.map((p, i) => <div key={i} className="flex gap-2 mb-2 text-sm text-gray-700"><span className="font-bold text-amber-600 shrink-0">P{i + 1}:</span><span>{p}</span></div>)}
+      </div>
+      <textarea value={essay} onChange={e => setEssay(e.target.value)} placeholder="Write your essay here..." className="w-full rounded-xl border border-gray-200 p-4 text-sm leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-rose-300 bg-white/80 backdrop-blur" rows={14} style={{ fontFamily: "Georgia, serif" }} />
+      <div className="text-xs text-gray-400 text-right">{essay.split(/\s+/).filter(Boolean).length} words</div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHATBOT COMPONENT
+// ═══════════════════════════════════════════════════════════
+
+function ChatbotPanel({ onClose }) {
+  const [messages, setMessages] = useState([{ role: "bot", text: "Hey there! 👋 I'm your ACT study assistant. I can solve math problems, explain concepts, and help with test strategies.\n\nTry typing a math expression like **sqrt(144)** or ask me about any ACT topic!\n\nType **help** to see everything I can do." }]);
+  const [input, setInput] = useState("");
+  const endRef = useRef(null);
+
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+
+  const send = () => {
+    if (!input.trim()) return;
+    const userMsg = input.trim();
+    setMessages(m => [...m, { role: "user", text: userMsg }]);
+    setInput("");
+    setTimeout(() => {
+      const reply = chatbotRespond(userMsg);
+      setMessages(m => [...m, { role: "bot", text: reply }]);
+    }, 300);
+  };
+
+  return (
+    <div className="fixed bottom-0 right-0 w-full sm:w-96 h-[32rem] sm:bottom-4 sm:right-4 rounded-t-2xl sm:rounded-2xl flex flex-col shadow-2xl overflow-hidden z-50 border border-white/30" style={{ background: "rgba(255,255,255,0.92)", backdropFilter: "blur(30px)" }}>
+      <div className="flex items-center justify-between px-4 py-3" style={{ background: "linear-gradient(135deg, #3B82F6, #8B5CF6)" }}>
+        <div className="flex items-center gap-2 text-white"><span className="text-lg">🤖</span><span className="font-bold text-sm">ACT Study Buddy</span><span className="text-xs opacity-70 bg-white/20 px-2 py-0.5 rounded-full">Math solver + Q&A</span></div>
+        <button onClick={onClose} className="text-white/80 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/20">×</button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+        {messages.map((m, i) => (
+          <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-line ${m.role === "user" ? "bg-blue-500 text-white rounded-br-md" : "bg-gray-100 text-gray-800 rounded-bl-md"}`}>
+              {m.text.split(/\*\*(.*?)\*\*/g).map((part, j) => j % 2 === 1 ? <strong key={j}>{part}</strong> : part)}
+            </div>
+          </div>
+        ))}
+        <div ref={endRef} />
+      </div>
+      <div className="p-3 border-t border-gray-100">
+        <div className="flex gap-2">
+          <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} placeholder="Type a question or math expression..." className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-gray-50" />
+          <button onClick={send} className="px-4 py-2.5 rounded-xl bg-blue-500 text-white font-semibold text-sm active:scale-95 transition-transform">Send</button>
+        </div>
+        <div className="flex gap-1.5 mt-2 flex-wrap">
+          {["help", "slope formula", "quadratic formula", "essay tips", "scoring info"].map(q => (
+            <button key={q} onClick={() => { setInput(q); }} className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition">{q}</button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// TEST SIMULATOR
+// ═══════════════════════════════════════════════════════════
+
+const SIM_SECTIONS = [
+  { key: "english", name: "English (Required)", icon: "📝", questions: 50, minutes: 35 },
+  { key: "math", name: "Math (Required)", icon: "🔢", questions: 45, minutes: 50 },
+  { key: "reading", name: "Reading (Required)", icon: "📚", questions: 36, minutes: 40 },
+  { key: "science", name: "Science (Optional)", icon: "🔬", questions: 40, minutes: 40 },
+  { key: "writing", name: "Writing (Optional)", icon: "✍️", questions: 1, minutes: 40 },
+];
+
+function genSimQs(key) {
+  const pool = QUESTIONS[key] || [];
+  if (!pool.length) return [];
+  const n = Math.min(SECTIONS[key]?.questions || pool.length, pool.length * 3);
+  // Shuffle and repeat questions to fill the section, then shuffle the whole set
+  const repeated = Array.from({ length: n }, (_, i) => ({ ...pool[i % pool.length], _id: i }));
+  return shuffle(repeated);
+}
+
+function TestSimulator({ onExit, onFinish, history }) {
+  const [phase, setPhase] = useState("setup"); // setup | running | done | review
+  const [reviewAttempt, setReviewAttempt] = useState(null);
+  const [sel, setSel] = useState({ english: true, math: true, reading: true, science: true, writing: false });
+  const [secIdx, setSecIdx] = useState(0);
+  const [qIdx, setQIdx] = useState(0);
+  const [picked, setPicked] = useState(null);
+  const [answers, setAnswers] = useState({});
+  const [timer, setTimer] = useState(0);
+  const [warn, setWarn] = useState(false);
+  // Store pre-generated questions per section so they don't reshuffle during the test
+  const [allQs, setAllQs] = useState({});
+  const [examResult, setExamResult] = useState(null);
+  const iRef = useRef(null);
+  const advanceRef = useRef(null);
+  const active = SIM_SECTIONS.filter(s => sel[s.key]);
+  const curSec = active[secIdx];
+  const curQs = (curSec && allQs[curSec.key]) || [];
+
+  useEffect(() => {
+    const h = () => { if (!document.fullscreenElement && phase === "running") setWarn(true); };
+    document.addEventListener("fullscreenchange", h);
+    return () => document.removeEventListener("fullscreenchange", h);
+  }, [phase]);
+
+  // Store advanceSec in a ref so the timer callback always has the latest
+  advanceRef.current = () => {
+    clearInterval(iRef.current);
+    if (secIdx + 1 >= active.length) { document.exitFullscreen?.().catch(() => {}); finishExam(); }
+    else { const n = secIdx + 1; setSecIdx(n); setQIdx(0); setPicked(null); setTimer(active[n].minutes * 60); }
+  };
+
+  useEffect(() => {
+    if (phase === "running" && timer > 0) {
+      iRef.current = setInterval(() => setTimer(t => { if (t <= 1) { clearInterval(iRef.current); advanceRef.current(); return 0; } return t - 1; }), 1000);
+    }
+    return () => clearInterval(iRef.current);
+  }, [phase, timer, secIdx]);
+
+  const startSim = () => {
+    if (!active.length) return;
+    // Pre-generate and shuffle all questions for every selected section ONCE
+    const generated = {};
+    active.forEach(s => { generated[s.key] = genSimQs(s.key); });
+    setAllQs(generated);
+    setSecIdx(0); setQIdx(0); setAnswers({}); setPicked(null); setExamResult(null);
+    setTimer(active[0].minutes * 60); setPhase("running");
+    document.documentElement.requestFullscreen?.().catch(() => {});
+  };
+
+  const finishExam = () => {
+    // Grade each section and store full question/answer detail for review
+    const results = {};
+    const reviewData = {}; // { sectionKey: [{ question, choices, answer, picked, correct, context, explanation }] }
+    let totalCorrect = 0, totalQs = 0;
+    active.forEach((sec, si) => {
+      if (sec.key === "writing") return;
+      const secQs = allQs[sec.key] || [];
+      let correct = 0;
+      const secReview = [];
+      secQs.forEach((q, qi) => {
+        const userPick = answers[`${si}-${qi}`];
+        const isCorrect = userPick != null && userPick === q.answer;
+        if (isCorrect) correct++;
+        secReview.push({ question: q.question, choices: q.choices, answer: q.answer, picked: userPick, correct: isCorrect, context: q.context, explanation: q.explanation });
+      });
+      results[sec.key] = { correct, total: secQs.length, pct: secQs.length > 0 ? Math.round((correct / secQs.length) * 100) : 0 };
+      reviewData[sec.key] = secReview;
+      totalCorrect += correct; totalQs += secQs.length;
+    });
+    const overall = totalQs > 0 ? Math.round((totalCorrect / totalQs) * 100) : 0;
+    const result = { date: new Date().toLocaleString(), sections: results, totalCorrect, totalQs, overall, sectionKeys: active.map(s => s.key).filter(k => k !== "writing"), reviewData };
+    setExamResult(result);
+    if (onFinish) onFinish(result);
+    setPhase("done");
+  };
+
+  const m = String(Math.floor(timer / 60)).padStart(2, "0");
+  const s = String(timer % 60).padStart(2, "0");
+
+  // Review mode — show full question-by-question review for a past attempt
+  if (phase === "review" && reviewAttempt) {
+    return <ExamReview attempt={reviewAttempt} onBack={() => { setReviewAttempt(null); setPhase("setup"); }} />;
+  }
+
+  if (phase === "setup") return (
+    <div className="max-w-2xl mx-auto flex flex-col gap-6 py-4 px-2">
+      <div><h2 className="text-2xl font-bold text-gray-800 mb-1">🎯 ACT Test Simulator</h2><p className="text-gray-500 text-sm">Select sections. Goes fullscreen with automatic timer per section.</p></div>
+      <div className="flex flex-col gap-3">
+        {SIM_SECTIONS.map(s => (
+          <label key={s.key} className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all ${glass} ${glassHover}`} style={{ borderColor: sel[s.key] ? SECTIONS[s.key].accent : "rgba(255,255,255,0.4)" }}>
+            <input type="checkbox" checked={sel[s.key]} onChange={e => setSel(p => ({ ...p, [s.key]: e.target.checked }))} className="w-5 h-5 accent-blue-500 rounded" />
+            <span className="text-2xl">{s.icon}</span>
+            <div><div className="font-semibold text-gray-800">{s.name}</div><div className="text-xs text-gray-500">{s.questions} {s.questions > 1 ? "questions" : "prompt"} · {s.minutes} min</div></div>
+          </label>
+        ))}
+      </div>
+      <div className={`rounded-xl p-4 text-sm text-amber-800 ${glass}`} style={{ backgroundColor: "rgba(255,251,235,0.7)" }}>
+        <span className="font-bold">⚠️ Before you begin:</span> Fullscreen activates. Exiting triggers a warning. Have scratch paper ready. No guessing penalty — answer everything! Good luck! 🍀
+      </div>
+      <div className="flex gap-3">
+        <button onClick={onExit} className={`px-6 py-3 rounded-xl font-semibold text-gray-700 ${glass}`}>← Back</button>
+        <button onClick={startSim} disabled={!active.length} className="flex-1 py-3 rounded-xl font-bold text-white shadow-lg disabled:opacity-40" style={{ background: "linear-gradient(135deg, #1E40AF, #7C3AED)" }}>🚀 Start Exam</button>
+      </div>
+
+      {/* Score History */}
+      {history && history.length > 0 && (
+        <div className="mt-2">
+          <h3 className="text-lg font-bold text-gray-700 mb-3">📊 Score History</h3>
+          <div className="flex flex-col gap-2">
+            {history.slice().reverse().map((h, i) => (
+              <div key={i} className={`rounded-xl p-4 ${glass}`}>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-xs text-gray-500">Attempt {history.length - i} — {h.date}</span>
+                  <span className="text-lg font-bold" style={{ color: h.overall >= 80 ? "#10B981" : h.overall >= 60 ? "#F59E0B" : "#EF4444" }}>{h.overall}%</span>
+                </div>
+                <div className="flex items-center gap-1 mb-2">
+                  <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div className="h-2 rounded-full transition-all" style={{ width: `${h.overall}%`, backgroundColor: h.overall >= 80 ? "#10B981" : h.overall >= 60 ? "#F59E0B" : "#EF4444" }} />
+                  </div>
+                  <span className="text-xs text-gray-500 ml-2">{h.totalCorrect}/{h.totalQs}</span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {h.sectionKeys.map(key => {
+                    const r = h.sections[key];
+                    if (!r) return null;
+                    return (
+                      <span key={key} className="text-[11px] font-medium px-2 py-1 rounded-lg" style={{ backgroundColor: SECTIONS[key]?.accent + "20", color: SECTIONS[key]?.accent }}>
+                        {SECTIONS[key]?.icon} {r.correct}/{r.total} ({r.pct}%)
+                      </span>
+                    );
+                  })}
+                  {h.reviewData && (
+                    <button onClick={() => { setReviewAttempt(h); setPhase("review"); }}
+                      className="ml-auto text-[11px] font-semibold px-3 py-1 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition shrink-0">
+                      📋 Review
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  if (phase === "done" && examResult) return (
+    <div className="max-w-lg mx-auto flex flex-col items-center gap-6 py-8 text-center px-4">
+      <div className="text-7xl">{examResult.overall >= 80 ? "🏆" : examResult.overall >= 60 ? "👍" : "📚"}</div>
+      <h2 className="text-3xl font-bold text-gray-800">Exam Complete!</h2>
+
+      {/* Overall score */}
+      <div className="w-full rounded-2xl p-6 text-center" style={{ background: `linear-gradient(135deg, ${examResult.overall >= 80 ? "#ECFDF5" : examResult.overall >= 60 ? "#FFFBEB" : "#FEF2F2"}, white)` }}>
+        <div className="text-5xl font-black mb-1" style={{ color: examResult.overall >= 80 ? "#10B981" : examResult.overall >= 60 ? "#F59E0B" : "#EF4444" }}>{examResult.overall}%</div>
+        <div className="text-sm text-gray-500">{examResult.totalCorrect} of {examResult.totalQs} correct</div>
+        <div className="mt-3 w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+          <div className="h-3 rounded-full transition-all" style={{ width: `${examResult.overall}%`, backgroundColor: examResult.overall >= 80 ? "#10B981" : examResult.overall >= 60 ? "#F59E0B" : "#EF4444" }} />
+        </div>
+      </div>
+
+      {/* Per-section breakdown */}
+      <div className="w-full flex flex-col gap-2">
+        <div className="text-sm font-bold text-gray-700 text-left">Section Breakdown</div>
+        {examResult.sectionKeys.map(key => {
+          const r = examResult.sections[key];
+          if (!r) return null;
+          const meta = SECTIONS[key];
+          return (
+            <div key={key} className={`rounded-xl p-4 text-left ${glass}`}>
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-semibold text-sm text-gray-800">{meta?.icon} {meta?.name}</span>
+                <span className="font-bold text-sm" style={{ color: r.pct >= 80 ? "#10B981" : r.pct >= 60 ? "#F59E0B" : "#EF4444" }}>{r.correct}/{r.total} ({r.pct}%)</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div className="h-2 rounded-full" style={{ width: `${r.pct}%`, backgroundColor: meta?.accent }} />
+              </div>
+              <div className="text-xs text-gray-500 mt-1">{r.pct >= 80 ? "Strong — keep it up!" : r.pct >= 60 ? "Solid — review missed topics." : "Needs work — focus study time here."}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Advice */}
+      <div className={`w-full rounded-xl p-4 text-left text-sm ${glass}`}>
+        <div className="font-bold text-gray-700 mb-2">📋 Next Steps</div>
+        <div className="text-gray-600 leading-relaxed">
+          {examResult.overall >= 80
+            ? "Excellent work! Focus on the few questions you missed and keep doing practice tests to maintain this level."
+            : examResult.overall >= 60
+            ? "Good progress! Review the sections where you scored below 70% — use the flashcards and study notes for those topics, then retake the exam."
+            : "Keep going — every practice test teaches you something. Focus on your weakest section first using flashcards and quizzes, then come back for another attempt."}
+        </div>
+      </div>
+
+      <div className="flex gap-3 w-full">
+        <button onClick={() => { setReviewAttempt(examResult); setPhase("review"); }} className="flex-1 px-6 py-3 rounded-xl font-semibold text-white" style={{ background: "linear-gradient(135deg, #8B5CF6, #6366F1)" }}>📋 Review Answers</button>
+        <button onClick={() => setPhase("setup")} className="flex-1 px-6 py-3 rounded-xl font-semibold text-white" style={{ backgroundColor: "#3B82F6" }}>🔄 Retake</button>
+        <button onClick={onExit} className={`flex-1 px-6 py-3 rounded-xl font-semibold text-gray-700 ${glass}`}>Dashboard</button>
+      </div>
+    </div>
+  );
+
+  const curQ = curQs[qIdx];
+  return (
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#0F172A", color: "white" }}>
+      {warn && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-8 max-w-sm text-center shadow-2xl">
+            <div className="text-5xl mb-4">⚠️</div><h3 className="text-xl font-bold text-gray-800 mb-2">Fullscreen Exited</h3>
+            <p className="text-gray-500 text-sm mb-6">On the real ACT, leaving the testing area can result in dismissal. Return to fullscreen to continue.</p>
+            <button onClick={() => { setWarn(false); document.documentElement.requestFullscreen?.(); }} className="w-full py-3 rounded-xl font-semibold bg-blue-500 text-white">Return to Fullscreen</button>
+          </div>
+        </div>
+      )}
+      <div className="flex items-center justify-between px-6 py-3" style={{ background: "linear-gradient(90deg, #1E293B, #0F172A)" }}>
+        <div className="flex items-center gap-3"><span className="text-xl">{curSec?.icon}</span><div><div className="font-bold">{curSec?.name}</div><div className="text-xs text-slate-400">Section {secIdx + 1} of {active.length}</div></div></div>
+        <div className="flex items-center gap-4">
+          <div className="px-4 py-1.5 rounded-lg font-mono text-lg font-bold" style={{ backgroundColor: timer < 300 ? "#7F1D1D" : "#1E3A5F", color: timer < 300 ? "#FCA5A5" : "#93C5FD" }}>{m}:{s}</div>
+          <div className="text-xs text-slate-400">{qIdx + 1} / {curQs.length}</div>
+        </div>
+      </div>
+      <div className="flex gap-1 px-6 pt-3">{active.map((s, i) => <div key={s.key} className="text-xs px-2 py-1 rounded font-medium" style={{ backgroundColor: i < secIdx ? "#10B981" : i === secIdx ? SECTIONS[s.key].accent : "#334155", color: "white" }}>{s.icon} {s.name}</div>)}</div>
+      <div className="flex-1 flex flex-col px-6 py-6 max-w-3xl mx-auto w-full">
+        {curQ ? (<>
+          {curQ.context && <div className="mb-4 p-4 rounded-xl text-sm italic" style={{ backgroundColor: "#1E293B", color: "#94A3B8", borderLeft: `3px solid ${SECTIONS[curSec?.key]?.accent}` }}>{curQ.context}</div>}
+          <div className="text-lg font-semibold mb-6">{curQ.question}</div>
+          <div className="flex flex-col gap-2.5">{curQ.choices?.map((c, i) => (
+            <button key={i} onClick={() => setPicked(i)} className="text-left p-3.5 rounded-xl border-2 font-medium transition-all text-sm"
+              style={{ borderColor: picked === i ? SECTIONS[curSec?.key]?.accent : "#334155", backgroundColor: picked === i ? SECTIONS[curSec?.key]?.accent + "30" : "#1E293B", color: picked === i ? "white" : "#CBD5E1" }}>
+              {c}
+            </button>
+          ))}</div>
+        </>) : (
+          <div className="text-center text-slate-400 py-12"><div className="text-5xl mb-4">✍️</div><div className="text-xl font-semibold mb-2">Writing Section</div><div className="text-sm">Use scratch paper for your essay.</div></div>
+        )}
+      </div>
+      <div className="flex items-center justify-between px-6 py-3" style={{ background: "linear-gradient(90deg, #1E293B, #0F172A)" }}>
+        <button onClick={() => setQIdx(i => Math.max(0, i - 1))} disabled={qIdx === 0} className="px-5 py-2 rounded-lg bg-slate-700 font-medium disabled:opacity-40 text-sm">← Prev</button>
+        <div className="flex gap-1 flex-wrap max-w-md justify-center">
+          {curQs.slice(0, 25).map((_, i) => (
+            <button key={i} onClick={() => setQIdx(i)} className="w-6 h-6 rounded text-[10px] font-bold"
+              style={{ backgroundColor: i === qIdx ? SECTIONS[curSec?.key]?.accent : answers[`${secIdx}-${i}`] != null ? "#10B981" : "#334155", color: "white" }}>{i + 1}</button>
+          ))}
+          {curQs.length > 25 && <span className="text-slate-500 text-xs self-center ml-1">+{curQs.length - 25}</span>}
+        </div>
+        {qIdx + 1 < curQs.length
+          ? <button onClick={() => { if (picked != null) setAnswers(p => ({ ...p, [`${secIdx}-${qIdx}`]: picked })); setQIdx(i => i + 1); setPicked(null); }} className="px-5 py-2 rounded-lg bg-slate-700 font-medium text-sm">Next →</button>
+          : <button onClick={() => { if (picked != null) setAnswers(p => ({ ...p, [`${secIdx}-${qIdx}`]: picked })); advanceRef.current(); }} className="px-5 py-2 rounded-lg font-semibold text-white text-sm" style={{ backgroundColor: "#10B981" }}>{secIdx + 1 >= active.length ? "Finish ✓" : "Next Section →"}</button>
+        }
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// EXAM REVIEW MODE
+// ═══════════════════════════════════════════════════════════
+
+function ExamReview({ attempt, onBack }) {
+  const [activeSec, setActiveSec] = useState(attempt.sectionKeys[0]);
+  const [filter, setFilter] = useState("all"); // all | wrong | right
+  const questions = attempt.reviewData?.[activeSec] || [];
+  const filtered = filter === "all" ? questions : filter === "wrong" ? questions.filter(q => !q.correct) : questions.filter(q => q.correct);
+  const secResult = attempt.sections[activeSec];
+
+  return (
+    <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(180deg, #F8FAFC, #F1F5F9)" }}>
+      {/* Header */}
+      <div className="px-6 py-4 flex items-center gap-4 text-white" style={{ background: "linear-gradient(135deg, #1E40AF, #7C3AED)" }}>
+        <button onClick={onBack} className="p-2 rounded-lg bg-white/20 hover:bg-white/30 font-bold text-lg">←</button>
+        <div className="flex-1">
+          <h1 className="text-xl font-bold">📋 Exam Review</h1>
+          <div className="text-sm opacity-80">{attempt.date} — {attempt.overall}% overall ({attempt.totalCorrect}/{attempt.totalQs})</div>
+        </div>
+      </div>
+
+      {/* Section tabs */}
+      <div className="flex gap-1 px-4 pt-3 overflow-x-auto">
+        {attempt.sectionKeys.map(key => {
+          const meta = SECTIONS[key];
+          const r = attempt.sections[key];
+          return (
+            <button key={key} onClick={() => { setActiveSec(key); setFilter("all"); }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all shrink-0"
+              style={activeSec === key
+                ? { backgroundColor: meta?.accent + "18", color: meta?.accent, border: `1.5px solid ${meta?.accent}40` }
+                : { color: "#6B7280", border: "1.5px solid transparent" }}>
+              <span>{meta?.icon}</span> {meta?.name}
+              <span className="text-[10px] ml-1 opacity-70">{r?.correct}/{r?.total}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Section score bar */}
+      {secResult && (
+        <div className="mx-6 mt-3 rounded-xl p-3 flex items-center gap-4" style={{ backgroundColor: SECTIONS[activeSec]?.accent + "10" }}>
+          <div className="font-bold text-lg" style={{ color: SECTIONS[activeSec]?.accent }}>{secResult.pct}%</div>
+          <div className="flex-1"><ProgressBar value={secResult.correct} max={secResult.total} color={SECTIONS[activeSec]?.accent} /></div>
+          <div className="text-xs text-gray-500">{secResult.correct} of {secResult.total} correct</div>
+        </div>
+      )}
+
+      {/* Filter buttons */}
+      <div className="flex gap-2 px-6 mt-3">
+        {[{ id: "all", label: `All (${questions.length})` }, { id: "wrong", label: `Wrong (${questions.filter(q => !q.correct).length})` }, { id: "right", label: `Correct (${questions.filter(q => q.correct).length})` }].map(f => (
+          <button key={f.id} onClick={() => setFilter(f.id)}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+            style={filter === f.id
+              ? { backgroundColor: f.id === "wrong" ? "#FEE2E2" : f.id === "right" ? "#D1FAE5" : SECTIONS[activeSec]?.accent + "20", color: f.id === "wrong" ? "#DC2626" : f.id === "right" ? "#059669" : SECTIONS[activeSec]?.accent }
+              : { backgroundColor: "#F3F4F6", color: "#6B7280" }}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Questions list */}
+      <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-4">
+        {filtered.length === 0 && (
+          <div className="text-center text-gray-400 py-12">{filter === "wrong" ? "No wrong answers in this section — great job! 🎉" : "No questions to show."}</div>
+        )}
+        {filtered.map((q, i) => {
+          const origIdx = questions.indexOf(q);
+          return (
+            <div key={i} className={`rounded-2xl p-5 border-2 ${glass}`}
+              style={{ borderColor: q.correct ? "#A7F3D0" : "#FECACA", backgroundColor: q.correct ? "rgba(236,253,245,0.5)" : "rgba(254,242,242,0.5)" }}>
+              {/* Status badge */}
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ backgroundColor: q.correct ? "#D1FAE5" : "#FEE2E2", color: q.correct ? "#059669" : "#DC2626" }}>
+                  {q.correct ? "✓ Correct" : "✗ Incorrect"} — Q{origIdx + 1}
+                </span>
+                {q.picked == null && <span className="text-xs text-gray-400 italic">Unanswered</span>}
+              </div>
+
+              {/* Context */}
+              {q.context && (
+                <div className="mb-3 p-3 rounded-xl text-sm text-gray-600 italic leading-relaxed" style={{ backgroundColor: SECTIONS[activeSec]?.accent + "08", borderLeft: `3px solid ${SECTIONS[activeSec]?.accent}40` }}>
+                  {q.context}
+                </div>
+              )}
+
+              {/* Question */}
+              <div className="text-sm font-semibold text-gray-800 mb-3">{q.question}</div>
+
+              {/* Choices */}
+              <div className="flex flex-col gap-1.5">
+                {q.choices?.map((c, ci) => {
+                  const isCorrectAnswer = ci === q.answer;
+                  const isUserPick = ci === q.picked;
+                  let bg = "bg-gray-50 text-gray-500";
+                  let border = "border-transparent";
+                  let icon = "";
+                  if (isCorrectAnswer) { bg = "bg-emerald-50 text-emerald-800"; border = "border-emerald-300"; icon = "✓ "; }
+                  if (isUserPick && !isCorrectAnswer) { bg = "bg-red-50 text-red-800 line-through"; border = "border-red-300"; icon = "✗ "; }
+                  if (isUserPick && isCorrectAnswer) { bg = "bg-emerald-100 text-emerald-900"; border = "border-emerald-400"; icon = "✓ "; }
+                  return (
+                    <div key={ci} className={`rounded-lg px-3 py-2 text-sm border ${bg} ${border}`}>
+                      {icon}{c}
+                      {isCorrectAnswer && !isUserPick && <span className="ml-2 text-xs font-semibold text-emerald-600">(correct answer)</span>}
+                      {isUserPick && !isCorrectAnswer && <span className="ml-2 text-xs font-semibold text-red-500">(your answer)</span>}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Explanation */}
+              {q.explanation && (
+                <div className="mt-3 p-3 rounded-xl text-xs text-blue-800 leading-relaxed" style={{ backgroundColor: "#EFF6FF", borderLeft: "3px solid #93C5FD" }}>
+                  <span className="font-bold">Explanation: </span>{q.explanation}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// GUIDE PAGE
+// ═══════════════════════════════════════════════════════════
+
+function GuidePage() {
+  const [open, setOpen] = useState(0);
+  return (
+    <div className="flex-1 overflow-y-auto" style={{ background: "linear-gradient(135deg, #EFF6FF 0%, #FDF4FF 50%, #FFF7ED 100%)" }}>
+      <div className="px-6 py-4 flex items-center gap-3" style={{ background: "linear-gradient(135deg, #1E40AF, #7C3AED)", color: "white" }}>
+        <div><h1 className="text-xl font-bold">📖 ACT Study Guide</h1><p className="text-sm opacity-80">Everything you need to pass the ACT</p></div>
+      </div>
+      <div className="p-6 max-w-3xl mx-auto flex flex-col gap-3">
+        {GUIDE_SECTIONS.map((sec, i) => (
+          <div key={i} className={`rounded-2xl overflow-hidden ${glass}`}>
+            <button onClick={() => setOpen(open === i ? null : i)} className="w-full flex items-center gap-4 p-5 text-left hover:bg-white/40 transition">
+              <div className="text-2xl">{sec.icon}</div>
+              <div className="flex-1 font-bold text-gray-800">{sec.title}</div>
+              <span className="text-xl text-gray-400">{open === i ? "−" : "+"}</span>
+            </button>
+            {open === i && (
+              <div className="px-5 pb-5 pt-2 text-sm text-gray-700 leading-relaxed whitespace-pre-line" style={{ borderTop: "1px solid rgba(0,0,0,0.06)" }}>
+                {sec.content}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// SECTION PAGE (no header — tabs handle navigation)
+// ═══════════════════════════════════════════════════════════
+
+function SectionPage({ sectionKey }) {
+  const meta = SECTIONS[sectionKey];
+  const [mode, setMode] = useState("cards");
+  const subtabs = sectionKey === "writing"
+    ? [{ id: "cards", label: "Flashcards", icon: "🃏" }, { id: "notes", label: "Study Notes", icon: "📖" }, { id: "essay", label: "Essay Practice", icon: "✍️" }]
+    : [{ id: "cards", label: "Flashcards", icon: "🃏" }, { id: "notes", label: "Study Notes", icon: "📖" }, { id: "quiz", label: "Practice Quiz", icon: "✏️" }];
+
+  return (
+    <div className="flex flex-col flex-1">
+      {/* Section header banner */}
+      <div className="px-6 py-4 flex items-center gap-4 text-white" style={{ background: `linear-gradient(135deg, ${meta.accent}, ${meta.accent}CC)` }}>
+        <div className="text-3xl">{meta.icon}</div>
+        <div className="flex-1"><h1 className="text-xl font-bold">{meta.name}</h1><div className="text-sm opacity-80">{meta.desc}</div></div>
+        <div className="text-right text-sm opacity-90"><div className="font-bold">{meta.questions} {meta.questions === 1 ? "Prompt" : "Qs"}</div><div>{meta.minutes} min</div></div>
+      </div>
+      {/* Sub-mode tabs */}
+      <div className="flex gap-1 px-6 pt-3 bg-gray-50/50">
+        {subtabs.map(t => (
+          <button key={t.id} onClick={() => setMode(t.id)} className="px-4 py-2 rounded-t-xl font-semibold text-sm transition-all"
+            style={{ backgroundColor: mode === t.id ? "rgba(255,255,255,0.9)" : "transparent", color: mode === t.id ? meta.accent : "#6B7280", borderBottom: mode === t.id ? `3px solid ${meta.accent}` : "none", backdropFilter: mode === t.id ? "blur(20px)" : "none" }}>
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex-1 mx-6 mb-6 rounded-b-2xl rounded-tr-2xl p-6 bg-white/70 backdrop-blur-xl border border-white/50 shadow-lg overflow-y-auto">
+        {mode === "cards" && <FlashcardsMode sectionKey={sectionKey} />}
+        {mode === "notes" && <StudyNotesMode sectionKey={sectionKey} />}
+        {mode === "quiz" && <QuizMode sectionKey={sectionKey} />}
+        {mode === "essay" && <EssayPracticeMode />}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// HOME DASHBOARD (compact — tabs handle navigation now)
+// ═══════════════════════════════════════════════════════════
+
+function HomeDashboard({ user }) {
+  const testDate = getUserTestDate(user);
+  const daysUntilTest = testDate ? Math.ceil((new Date(testDate) - new Date()) / (1000 * 60 * 60 * 24)) : null;
+
+  return (
+    <div className="flex-1 overflow-y-auto" style={{ background: "linear-gradient(135deg, #EFF6FF 0%, #F5F3FF 35%, #FFF7ED 70%, #FFF1F2 100%)" }}>
+      <div className="px-6 pt-8 pb-4">
+        <div className="flex items-end gap-2 mb-1">
+          <span className="text-4xl font-black text-gray-800 tracking-tight">ACT</span>
+          <span className="text-3xl font-light bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent mb-0.5">Study Hub</span>
+        </div>
+        <div className="text-gray-500 text-sm">Welcome back, {getUserName(user)} 👋 Use the tabs above to jump to any section!</div>
+      </div>
+
+      {/* Test Countdown Banner */}
+      {daysUntilTest !== null && daysUntilTest > 0 && (
+        <div className="px-6 mb-5">
+          <div className="rounded-2xl p-4 flex items-center gap-4" style={{ background: "linear-gradient(135deg, #1E3A5F, #2D1B69)" }}>
+            <div className="text-3xl">📅</div>
+            <div className="flex-1">
+              <div className="text-white font-bold text-lg">{daysUntilTest} day{daysUntilTest !== 1 ? 's' : ''} until test day</div>
+              <div className="text-white/50 text-xs">{new Date(testDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-black text-white">{daysUntilTest}</div>
+              <div className="text-white/40 text-[10px] uppercase tracking-wider">days</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="px-6 mb-5 grid grid-cols-3 gap-3">
+        {[{ label: "Required Qs", val: "131", icon: "❓", c: "#3B82F6" }, { label: "Required Time", val: "2h 5m", icon: "⏱", c: "#8B5CF6" }, { label: "Sections", val: "3+2", icon: "📋", c: "#10B981" }].map(s => (
+          <div key={s.label} className={`rounded-2xl p-4 flex flex-col gap-1 ${glass}`}>
+            <div className="text-xl">{s.icon}</div><div className="text-xl font-bold" style={{ color: s.c }}>{s.val}</div><div className="text-[11px] text-gray-500">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="px-6 mb-5">
+        <h2 className="text-lg font-bold text-gray-700 mb-3">ACT at a Glance</h2>
+        <div className="flex flex-col gap-2">
+          {["english","math","reading","science","writing"].map(key => { const s = SECTIONS[key]; return (
+            <div key={key} className={`rounded-xl p-3 flex items-center gap-3 ${glass}`}>
+              <div className="text-xl w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${s.accent}20` }}>{s.icon}</div>
+              <div className="flex-1"><div className="font-semibold text-gray-800 text-sm">{s.name}</div><div className="text-xs text-gray-500">{s.desc}</div></div>
+              <div className="flex gap-2 shrink-0"><span className="text-[11px] font-semibold px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: s.accent }}>{s.questions} {s.questions === 1 ? "prompt" : "Qs"}</span><span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100/80 text-gray-600">{s.minutes} min</span></div>
+            </div>
+          );})}
+        </div>
+      </div>
+
+      <div className="px-6 pb-8">
+        <h2 className="text-lg font-bold text-gray-700 mb-3">Quick Tips</h2>
+        <div className={`rounded-2xl p-5 ${glass}`}>
+          {[
+            { i: "⏱", t: "Time yourself on every practice set — pacing is crucial on the ACT." },
+            { i: "🔄", t: "On English, re-read the full sentence with your answer to make sure it sounds right." },
+            { i: "📐", t: "On Math, eliminate clearly impossible answers before solving." },
+            { i: "📖", t: "On Reading, ALWAYS go back to the passage — never answer from memory." },
+            { i: "🔬", t: "On Science, the answer is almost always in the data — no outside knowledge needed." },
+            { i: "🎯", t: "Never leave a question blank! There's NO guessing penalty on the ACT." },
+          ].map((t, i) => <div key={i} className="flex gap-3 py-2.5 border-b border-gray-100/50 last:border-0"><span className="text-base shrink-0">{t.i}</span><span className="text-sm text-gray-600">{t.t}</span></div>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// FOCUS AREAS PAGE — WEAKNESS TRACKING & LEARNING PLAN
+// ═══════════════════════════════════════════════════════════
+
+// Topic tags for categorizing questions by skill area
+const TOPIC_TAGS = {
+  english: {
+    keywords: {
+      "parallel": "Parallel Structure", "modifier": "Modifiers", "dangling": "Modifiers",
+      "apostrophe": "Apostrophes & Possessives", "possessive": "Apostrophes & Possessives",
+      "comma": "Punctuation", "semicolon": "Punctuation", "colon": "Punctuation", "punctuat": "Punctuation",
+      "transition": "Transitions & Flow", "however": "Transitions & Flow", "therefore": "Transitions & Flow",
+      "verb": "Subject-Verb Agreement", "agreement": "Subject-Verb Agreement",
+      "pronoun": "Pronoun Usage", "who": "Pronoun Usage", "whom": "Pronoun Usage",
+      "concise": "Conciseness", "wordy": "Conciseness", "redundan": "Conciseness",
+      "tone": "Tone & Style", "style": "Tone & Style", "formal": "Tone & Style",
+      "sentence": "Sentence Structure", "fragment": "Sentence Structure", "run-on": "Sentence Structure",
+    },
+    fallback: "General English Skills",
+  },
+  math: {
+    keywords: {
+      "slope": "Linear Equations", "line": "Linear Equations", "y = mx": "Linear Equations",
+      "quadratic": "Quadratics & Polynomials", "factor": "Quadratics & Polynomials", "x²": "Quadratics & Polynomials",
+      "system": "Systems of Equations", "elimination": "Systems of Equations", "substitution": "Systems of Equations",
+      "triangle": "Geometry", "pythagorean": "Geometry", "angle": "Geometry", "circle": "Geometry", "area": "Geometry", "perimeter": "Geometry",
+      "sin": "Trigonometry", "cos": "Trigonometry", "tan": "Trigonometry", "trig": "Trigonometry",
+      "probability": "Probability & Statistics", "mean": "Probability & Statistics", "median": "Probability & Statistics", "percent": "Probability & Statistics",
+      "exponent": "Exponents & Radicals", "radical": "Exponents & Radicals", "sqrt": "Exponents & Radicals",
+      "function": "Functions", "f(x)": "Functions", "domain": "Functions", "range": "Functions",
+      "ratio": "Ratios & Proportions", "proportion": "Ratios & Proportions",
+      "inequalit": "Inequalities", "absolute": "Absolute Value",
+    },
+    fallback: "General Math Skills",
+  },
+  reading: {
+    keywords: {
+      "main idea": "Main Idea", "primarily": "Main Idea", "purpose": "Main Idea",
+      "infer": "Inference", "suggest": "Inference", "imply": "Inference",
+      "tone": "Author's Tone", "attitude": "Author's Tone",
+      "vocabulary": "Vocabulary in Context", "means most nearly": "Vocabulary in Context", "word": "Vocabulary in Context",
+      "detail": "Detail & Evidence", "according": "Detail & Evidence", "lines": "Detail & Evidence",
+      "structure": "Passage Structure", "organize": "Passage Structure",
+      "compare": "Paired Passage Analysis", "passage a": "Paired Passage Analysis", "passage b": "Paired Passage Analysis",
+    },
+    fallback: "General Reading Comprehension",
+  },
+  science: {
+    keywords: {
+      "graph": "Data Interpretation", "table": "Data Interpretation", "figure": "Data Interpretation", "data": "Data Interpretation",
+      "experiment": "Experimental Design", "variable": "Experimental Design", "control": "Experimental Design", "hypothesis": "Experimental Design",
+      "scientist": "Conflicting Viewpoints", "student": "Conflicting Viewpoints", "disagree": "Conflicting Viewpoints",
+      "trend": "Trends & Patterns", "increase": "Trends & Patterns", "decrease": "Trends & Patterns",
+    },
+    fallback: "General Science Reasoning",
+  },
+  writing: {
+    keywords: {
+      "thesis": "Thesis Development", "argument": "Thesis Development",
+      "evidence": "Supporting Evidence", "example": "Supporting Evidence",
+      "organize": "Organization", "structure": "Organization", "paragraph": "Organization",
+      "perspective": "Perspective Analysis",
+    },
+    fallback: "General Essay Writing",
+  },
+};
+
+function classifyQuestion(sectionKey, question) {
+  const text = `${question.question || ""} ${question.context || ""} ${question.explanation || ""}`.toLowerCase();
+  const topicMap = TOPIC_TAGS[sectionKey];
+  if (!topicMap) return "General";
+  for (const [kw, topic] of Object.entries(topicMap.keywords)) {
+    if (text.includes(kw)) return topic;
+  }
+  return topicMap.fallback;
+}
+
+// Study tips for each identified weak topic
+const STUDY_TIPS = {
+  "Parallel Structure": ["Practice identifying lists in sentences and check each item uses the same grammatical form.", "Look for patterns: noun-noun-noun or verb-verb-verb."],
+  "Modifiers": ["Ask: 'Who or what is doing the action?' The subject right after the comma must be the doer.", "Rewrite dangling modifiers by adding the correct subject."],
+  "Apostrophes & Possessives": ["Remember: apostrophes show possession or contraction, NEVER plurals.", "Test it's vs its by expanding: 'it is' works? Use it's. Otherwise, its."],
+  "Punctuation": ["Semicolons join two complete sentences. Test: can each side stand alone?", "FANBOYS (for, and, nor, but, or, yet, so) need a comma BEFORE them when joining independent clauses."],
+  "Transitions & Flow": ["Read the sentence before and after the blank. Ask: what's the logical relationship?", "Contrast = however/although. Cause = therefore/consequently. Addition = furthermore/moreover."],
+  "Subject-Verb Agreement": ["Cross out prepositional phrases between the subject and verb to find the true subject.", "Compound subjects with 'and' = plural; with 'or/nor' = match the closer noun."],
+  "Pronoun Usage": ["Check: does the pronoun clearly refer to ONE specific noun?", "Subject pronouns (I, she, he, they) vs object pronouns (me, her, him, them)."],
+  "Conciseness": ["When two answers say the same thing, pick the shorter one.", "Cut phrases like 'due to the fact that' → 'because'."],
+  "Tone & Style": ["Check if the answer matches the passage's overall formality level.", "Formal = no contractions, no slang. Informal = conversational, personal."],
+  "Sentence Structure": ["A complete sentence needs a subject + verb + complete thought.", "Run-on = two sentences smashed together. Fix with period, semicolon, or comma+FANBOYS."],
+  "Linear Equations": ["Master slope = rise/run = (y2-y1)/(x2-x1). Practice converting between slope-intercept and standard form.", "Parallel = same slope, perpendicular = negative reciprocal slopes."],
+  "Quadratics & Polynomials": ["Memorize the quadratic formula and practice factoring ax²+bx+c.", "Discriminant tells you # of solutions: positive=2, zero=1, negative=0."],
+  "Systems of Equations": ["Use elimination when coefficients line up; substitution when one variable is already isolated.", "No solution = parallel lines, infinite solutions = same line."],
+  "Geometry": ["Memorize ALL formulas — they're not provided on the ACT!", "Draw diagrams and label everything. Mark right angles and equal sides."],
+  "Trigonometry": ["SOHCAHTOA: Sin=Opp/Hyp, Cos=Adj/Hyp, Tan=Opp/Adj.", "Memorize the special triangle ratios: 30-60-90 and 45-45-90."],
+  "Probability & Statistics": ["Mean = sum÷count. Median = middle value (sort first!). Mode = most frequent.", "P(event) = favorable outcomes ÷ total outcomes. Check: with or without replacement?"],
+  "Exponents & Radicals": ["Same base? Add exponents when multiplying, subtract when dividing.", "Negative exponent = flip it: a⁻ⁿ = 1/aⁿ."],
+  "Functions": ["f(x) = plug the input in for every x. Domain = valid inputs, range = outputs.", "Composition: f(g(x)) means do g first, then plug result into f."],
+  "Ratios & Proportions": ["Cross multiply to solve: a/b = c/d → ad = bc.", "Percent change = (new-old)/old × 100. 'Of' means multiply."],
+  "Main Idea": ["Read the first and last paragraphs carefully — that's where the main idea lives.", "The correct answer is broader than any single detail but not too general."],
+  "Inference": ["The answer must be supported by text evidence — it's a small logical step, not a big leap.", "Eliminate answers that are too extreme or require outside knowledge."],
+  "Author's Tone": ["Look at word choice: positive, negative, or neutral descriptors?", "Common tones: analytical, nostalgic, critical, enthusiastic, skeptical."],
+  "Vocabulary in Context": ["Cover the word, predict a synonym from context, then match your prediction.", "The most common definition is often the WRONG answer on the ACT."],
+  "Detail & Evidence": ["Go BACK to the passage — never answer from memory.", "The answer is directly stated in the text. If you're inferring, you're overthinking."],
+  "Passage Structure": ["Note what each paragraph does: introduce, explain, contrast, conclude.", "Transition words between paragraphs reveal the organizational pattern."],
+  "Paired Passage Analysis": ["Identify each author's main claim first. Then compare: agree, disagree, or different focus?", "Answer single-passage questions first, comparison questions last."],
+  "Data Interpretation": ["Always read axis labels, units, and titles before looking at the data.", "Most answers are directly in the graph/table — just read carefully."],
+  "Experimental Design": ["Independent variable = what's changed. Dependent = what's measured. Controls = kept constant.", "Good experiments change ONLY ONE variable at a time."],
+  "Conflicting Viewpoints": ["Summarize each person's main claim in one sentence before answering.", "Find where they agree AND disagree."],
+  "Trends & Patterns": ["Direct: as X increases, Y increases. Inverse: as X increases, Y decreases.", "Check if the trend is linear, exponential, or has no clear pattern."],
+  "Thesis Development": ["A strong thesis takes a clear position AND acknowledges complexity.", "Template: 'Although [counter], [position] because [reason].'"],
+  "Supporting Evidence": ["Use specific, concrete examples instead of vague generalizations.", "Each body paragraph needs at least one detailed example."],
+  "Organization": ["Use clear transitions between paragraphs (Furthermore, However, In contrast).", "Each paragraph should have one clear focus that supports your thesis."],
+  "Perspective Analysis": ["You must address ALL three given perspectives, not just your own.", "Explain how each perspective relates to yours — agree, disagree, or qualify."],
+};
+
+function FocusAreasPage({ examHistory }) {
+  const [expandedSec, setExpandedSec] = useState(null);
+
+  // Aggregate all wrong answers across all exams
+  const analysis = {};
+  const sectionKeys = ["english", "math", "reading", "science", "writing"];
+
+  sectionKeys.forEach(sec => {
+    const wrongByTopic = {};
+    let totalWrong = 0;
+    let totalAnswered = 0;
+
+    examHistory.forEach(exam => {
+      const reviewData = exam.reviewData?.[sec];
+      if (!reviewData) return;
+      reviewData.forEach(q => {
+        if (q.picked != null) totalAnswered++;
+        if (!q.correct && q.picked != null) {
+          totalWrong++;
+          const topic = classifyQuestion(sec, q);
+          if (!wrongByTopic[topic]) wrongByTopic[topic] = { count: 0, questions: [] };
+          wrongByTopic[topic].count++;
+          wrongByTopic[topic].questions.push(q);
+        }
+      });
+    });
+
+    // Sort topics by frequency of wrong answers (most wrong first)
+    const sortedTopics = Object.entries(wrongByTopic)
+      .sort((a, b) => b[1].count - a[1].count)
+      .map(([topic, data]) => ({ topic, ...data }));
+
+    analysis[sec] = { totalWrong, totalAnswered, topics: sortedTopics };
+  });
+
+  const hasData = examHistory.length > 0 && Object.values(analysis).some(a => a.totalWrong > 0);
+
+  // Calculate overall weakness score per section for the summary
+  const sectionScores = sectionKeys
+    .filter(k => analysis[k].totalAnswered > 0)
+    .map(k => ({ key: k, ...analysis[k], pct: analysis[k].totalAnswered > 0 ? Math.round(((analysis[k].totalAnswered - analysis[k].totalWrong) / analysis[k].totalAnswered) * 100) : 100 }))
+    .sort((a, b) => a.pct - b.pct);
+
+  return (
+    <div className="flex-1 overflow-y-auto" style={{ background: "linear-gradient(135deg, #FFF7ED 0%, #FEF3C7 35%, #ECFDF5 70%, #EFF6FF 100%)" }}>
+      <div className="px-6 pt-8 pb-4">
+        <div className="flex items-end gap-2 mb-1">
+          <span className="text-3xl font-black text-gray-800 tracking-tight">Current Focuses</span>
+        </div>
+        <div className="text-gray-500 text-sm">Personalized learning plan based on your exam results</div>
+      </div>
+
+      {!hasData ? (
+        <div className="px-6">
+          <div className={`rounded-2xl p-8 text-center ${glass}`}>
+            <div className="text-5xl mb-4">📊</div>
+            <div className="text-lg font-bold text-gray-700 mb-2">No Data Yet</div>
+            <div className="text-sm text-gray-500 max-w-md mx-auto">
+              Take a practice exam in the Simulator tab first! Once you complete an exam, this page will analyze your wrong answers and create a personalized study plan for you.
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="px-6 pb-8">
+          {/* ── Overall Summary Cards ── */}
+          <div className="mb-6">
+            <h2 className="text-lg font-bold text-gray-700 mb-3">Performance Overview</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className={`rounded-2xl p-4 ${glass}`}>
+                <div className="text-2xl mb-1">📝</div>
+                <div className="text-2xl font-bold text-gray-800">{examHistory.length}</div>
+                <div className="text-[11px] text-gray-500">Exams Taken</div>
+              </div>
+              <div className={`rounded-2xl p-4 ${glass}`}>
+                <div className="text-2xl mb-1">❌</div>
+                <div className="text-2xl font-bold text-red-500">{Object.values(analysis).reduce((s, a) => s + a.totalWrong, 0)}</div>
+                <div className="text-[11px] text-gray-500">Total Missed</div>
+              </div>
+              <div className={`rounded-2xl p-4 ${glass}`}>
+                <div className="text-2xl mb-1">🎯</div>
+                <div className="text-2xl font-bold text-emerald-600">{sectionScores.length > 0 ? sectionScores[sectionScores.length - 1].pct + "%" : "—"}</div>
+                <div className="text-[11px] text-gray-500">Best Section</div>
+              </div>
+              <div className={`rounded-2xl p-4 ${glass}`}>
+                <div className="text-2xl mb-1">⚠️</div>
+                <div className="text-2xl font-bold text-amber-600">{sectionScores.length > 0 ? sectionScores[0].pct + "%" : "—"}</div>
+                <div className="text-[11px] text-gray-500">Weakest Section</div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Priority Ranking ── */}
+          {sectionScores.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-lg font-bold text-gray-700 mb-3">Study Priority Ranking</h2>
+              <div className="flex flex-col gap-2">
+                {sectionScores.map((s, i) => {
+                  const sec = SECTIONS[s.key];
+                  const barColor = s.pct >= 80 ? "#10B981" : s.pct >= 60 ? "#F59E0B" : "#EF4444";
+                  const priorityLabel = i === 0 ? "🔴 Top Priority" : i === 1 ? "🟡 High Priority" : i === 2 ? "🟢 Moderate" : "✅ Strong";
+                  return (
+                    <div key={s.key} className={`rounded-xl p-3 ${glass}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{sec.icon}</span>
+                          <span className="font-semibold text-sm text-gray-800">{sec.name}</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ backgroundColor: `${barColor}20`, color: barColor }}>{priorityLabel}</span>
+                        </div>
+                        <span className="text-sm font-bold" style={{ color: barColor }}>{s.pct}%</span>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-gray-200/60 overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${s.pct}%`, backgroundColor: barColor }} />
+                      </div>
+                      <div className="text-[11px] text-gray-500 mt-1">{s.totalWrong} missed out of {s.totalAnswered} answered • {s.topics.length} weak {s.topics.length === 1 ? "area" : "areas"} identified</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── Section-by-Section Breakdown ── */}
+          <h2 className="text-lg font-bold text-gray-700 mb-3">Detailed Breakdown & Study Plan</h2>
+          <div className="flex flex-col gap-3">
+            {sectionKeys.map(secKey => {
+              const sec = SECTIONS[secKey];
+              const data = analysis[secKey];
+              if (data.totalWrong === 0) return null;
+              const isExpanded = expandedSec === secKey;
+
+              return (
+                <div key={secKey} className={`rounded-2xl overflow-hidden ${glass}`}>
+                  <button
+                    onClick={() => setExpandedSec(isExpanded ? null : secKey)}
+                    className="w-full p-4 flex items-center gap-3 text-left hover:bg-white/40 transition"
+                  >
+                    <div className="text-2xl w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${sec.accent}20` }}>{sec.icon}</div>
+                    <div className="flex-1">
+                      <div className="font-bold text-gray-800">{sec.name}</div>
+                      <div className="text-xs text-gray-500">{data.totalWrong} wrong • {data.topics.length} weak {data.topics.length === 1 ? "topic" : "topics"}</div>
+                    </div>
+                    <span className="text-gray-400 text-lg transition-transform" style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0)" }}>▼</span>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="px-4 pb-4 flex flex-col gap-3">
+                      {data.topics.map((t, ti) => {
+                        const tips = STUDY_TIPS[t.topic] || ["Review this topic in your study materials and practice more questions."];
+                        const urgency = t.count >= 3 ? { label: "Critical", color: "#EF4444" } : t.count >= 2 ? { label: "Important", color: "#F59E0B" } : { label: "Review", color: "#3B82F6" };
+                        return (
+                          <div key={ti} className="rounded-xl border border-gray-200/60 bg-white/50 p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="font-semibold text-sm text-gray-800">{t.topic}</div>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: urgency.color }}>{urgency.label} • {t.count}x wrong</span>
+                            </div>
+
+                            {/* Study Tips */}
+                            <div className="mb-3">
+                              <div className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide mb-1">Study Tips</div>
+                              {tips.map((tip, i) => (
+                                <div key={i} className="flex items-start gap-2 mb-1">
+                                  <span className="text-emerald-500 mt-0.5 shrink-0">✦</span>
+                                  <span className="text-xs text-gray-700">{tip}</span>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Sample Missed Questions */}
+                            <div>
+                              <div className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide mb-1">Questions You Missed</div>
+                              {t.questions.slice(0, 3).map((q, qi) => (
+                                <div key={qi} className="rounded-lg bg-red-50/60 border border-red-100 p-2 mb-1.5 text-xs">
+                                  <div className="font-medium text-gray-800 mb-1">{q.question}</div>
+                                  <div className="flex gap-3 text-[11px]">
+                                    <span className="text-red-500">Your answer: {q.choices?.[q.picked] || "Skipped"}</span>
+                                    <span className="text-emerald-600">Correct: {q.choices?.[q.answer]}</span>
+                                  </div>
+                                  {q.explanation && <div className="text-gray-500 mt-1 italic">{q.explanation}</div>}
+                                </div>
+                              ))}
+                              {t.questions.length > 3 && <div className="text-[11px] text-gray-400 italic">+ {t.questions.length - 3} more missed questions</div>}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Section-specific Action Plan */}
+                      <div className="rounded-xl border-2 border-dashed p-4" style={{ borderColor: `${sec.accent}40`, backgroundColor: `${sec.accent}08` }}>
+                        <div className="font-semibold text-sm mb-2" style={{ color: sec.accent }}>📋 {sec.name} Action Plan</div>
+                        <div className="text-xs text-gray-700 space-y-1.5">
+                          <div>1. Review the <strong>{data.topics[0]?.topic}</strong> flashcards in the {sec.name} tab — this is your biggest gap.</div>
+                          {data.topics.length > 1 && <div>2. Practice questions focusing on <strong>{data.topics.slice(0, 3).map(t => t.topic).join(", ")}</strong>.</div>}
+                          <div>{data.topics.length > 1 ? "3" : "2"}. Retake a practice exam and track if your score improves in {sec.name}.</div>
+                          <div>{data.topics.length > 1 ? "4" : "3"}. Use the chatbot to ask about any {sec.name.toLowerCase()} concepts you find confusing.</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Sections with no wrong answers */}
+            {sectionKeys.filter(k => analysis[k].totalAnswered > 0 && analysis[k].totalWrong === 0).map(secKey => {
+              const sec = SECTIONS[secKey];
+              return (
+                <div key={secKey} className={`rounded-2xl p-4 flex items-center gap-3 ${glass}`}>
+                  <div className="text-2xl w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#10B98120" }}>✅</div>
+                  <div className="flex-1">
+                    <div className="font-bold text-gray-800">{sec.name}</div>
+                    <div className="text-xs text-emerald-600 font-medium">Perfect score! Keep it up!</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// MAIN APP — PERSISTENT TAB NAVIGATION
+// ═══════════════════════════════════════════════════════════
+
+const NAV_TABS = [
+  { id: "home",      label: "Home",      icon: "🏠" },
+  { id: "focus",     label: "Focus",     icon: "🎯" },
+  { id: "english",   label: "English",   icon: "📝" },
+  { id: "math",      label: "Math",      icon: "🔢" },
+  { id: "reading",   label: "Reading",   icon: "📚" },
+  { id: "science",   label: "Science",   icon: "🔬" },
+  { id: "writing",   label: "Writing",   icon: "✍️" },
+  { id: "guide",     label: "Guide",     icon: "📖" },
+  { id: "simulator", label: "Simulator", icon: "⏱" },
+  { id: "profile",   label: "Profile",   icon: "👤" },
+];
+
+function ACTStudyHub({ user, onLogout }) {
+  const [view, setView] = useState("home");
+  const [chatOpen, setChatOpen] = useState(false);
+  const [examHistory, setExamHistory] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const [sessionKicked, setSessionKicked] = useState(false);
+
+  // Verify session is still valid, kick out if not
+  const verifySession = async () => {
+    const valid = await checkSession(user.id);
+    if (!valid) {
+      setSessionKicked(true);
+      return false;
+    }
+    return true;
+  };
+
+  // Wrap setView with session check
+  const safeSetView = async (newView) => {
+    const ok = await verifySession();
+    if (ok) setView(newView);
+  };
+
+  // Load exam history from Supabase on first render
+  useEffect(() => {
+    loadCloudProgress(user.id).then(history => {
+      setExamHistory(history);
+      setLoaded(true);
+    });
+  }, [user.id]);
+
+  // Save exam history to Supabase whenever it changes (after initial load)
+  useEffect(() => {
+    if (loaded && examHistory.length > 0) {
+      verifySession().then(ok => {
+        if (ok) saveCloudProgress(user.id, examHistory);
+      });
+    }
+  }, [examHistory, loaded]);
+
+  const handleExamFinish = (result) => {
+    setExamHistory(prev => [...prev, result]);
+  };
+
+  // Session kicked modal
+  if (sessionKicked) return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background: "linear-gradient(135deg, #1E3A5F 0%, #2D1B69 40%, #0F172A 100%)" }}>
+      <div className="w-full max-w-sm mx-4 rounded-2xl p-8 backdrop-blur-xl bg-white/10 border border-white/20 shadow-2xl text-center">
+        <div className="text-5xl mb-4">🔒</div>
+        <h2 className="text-xl font-bold text-white mb-2">Session Ended</h2>
+        <p className="text-white/50 text-sm mb-6">Your account was logged in on another device. Only one active session is allowed at a time.</p>
+        <button onClick={onLogout} className="w-full py-3 rounded-xl font-semibold text-white transition" style={{ background: "linear-gradient(135deg, #3B82F6, #8B5CF6)" }}>
+          Back to Login
+        </button>
+      </div>
+    </div>
+  );
+
+  // When simulator is active, render it fullscreen without tabs
+  if (view === "simulator") {
+    return <TestSimulator onExit={() => safeSetView("home")} onFinish={handleExamFinish} history={examHistory} />;
+  }
+
+  return (
+    <div className="relative min-h-screen flex flex-col" style={{ background: "linear-gradient(180deg, #F8FAFC, #F1F5F9)" }}>
+      {/* ── Top Tab Bar ── */}
+      <nav className="sticky top-0 z-30 backdrop-blur-xl bg-white/80 border-b border-gray-200/60 shadow-sm">
+        <div className="flex items-center px-2 py-1 gap-0.5 overflow-x-auto scrollbar-hide">
+          {NAV_TABS.map(tab => {
+            const isActive = view === tab.id;
+            const sectionAccent = SECTIONS[tab.id]?.accent;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => safeSetView(tab.id)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all shrink-0 ${isActive ? "shadow-md" : "hover:bg-gray-100/60"}`}
+                style={isActive ? {
+                  backgroundColor: sectionAccent ? `${sectionAccent}18` : "rgba(99,102,241,0.1)",
+                  color: sectionAccent || "#6366F1",
+                  border: `1.5px solid ${sectionAccent || "#6366F1"}40`,
+                } : {
+                  color: "#6B7280",
+                  border: "1.5px solid transparent",
+                }}
+              >
+                <span className="text-base">{tab.icon}</span>
+                <span className="hidden sm:inline">{tab.label}</span>
+              </button>
+            );
+          })}
+          <button onClick={onLogout} className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all shrink-0 hover:bg-red-50 text-gray-400 hover:text-red-500" style={{ border: "1.5px solid transparent" }}>
+            <span className="text-base">🚪</span>
+            <span className="hidden sm:inline">Logout</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* ── Page Content ── */}
+      <div className="flex-1 flex flex-col">
+        {view === "home" && <HomeDashboard user={user} />}
+        {view === "focus" && <FocusAreasPage examHistory={examHistory} />}
+        {view === "guide" && <GuidePage />}
+        {view === "profile" && <ProfilePage user={user} onLogout={onLogout} />}
+        {["english", "math", "reading", "science", "writing"].includes(view) && (
+          <SectionPage key={view} sectionKey={view} />
+        )}
+      </div>
+
+      {/* ── Chatbot FAB ── */}
+      {!chatOpen && (
+        <button onClick={() => setChatOpen(true)} className="fixed bottom-5 right-5 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-2xl z-40 border-2 border-white/50 active:scale-95 transition-transform" style={{ background: "linear-gradient(135deg, #3B82F6, #8B5CF6)" }}>
+          🤖
+        </button>
+      )}
+      {chatOpen && <ChatbotPanel onClose={() => setChatOpen(false)} />}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// APP WITH AUTH — Wraps everything with login/session check
+// ═══════════════════════════════════════════════════════════
+function AppWithAuth() {
+  const [user, setUser] = useState(null);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    // Check if user is already logged in
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const u = session?.user || null;
+      setUser(u);
+      if (u) registerSession(u.id); // claim this session
+      setChecking(false);
+    });
+    // Listen for auth changes (login, logout, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const u = session?.user || null;
+      setUser(u);
+      if (u && _event === 'SIGNED_IN') registerSession(u.id); // claim on new login
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  };
+
+  if (checking) return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background: "linear-gradient(135deg, #EFF6FF 0%, #F5F3FF 35%, #FFF7ED 70%, #FFF1F2 100%)" }}>
+      <div className="text-xl text-gray-400 animate-pulse">Loading...</div>
+    </div>
+  );
+
+  if (!user) return <AuthScreen onLogin={setUser} />;
+  return <ACTStudyHub user={user} onLogout={handleLogout} />;
+}
+
+    // Mount the app
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<AppWithAuth />);
+  </script>
+</body>
+</html>
