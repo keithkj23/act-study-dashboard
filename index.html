@@ -789,7 +789,6 @@ function QuizMode({ sectionKey }) {
   const [answers, setAnswers] = useState([]);
 
   const reset = () => { setQs(getRotatedQuestions(sectionKey).map(shuffleChoices)); setStep("quiz"); setIdx(0); setSelected(null); setSubmitted(false); setAnswers([]); };
-  if (!qs.length) return <div className="text-gray-400 text-center py-12">No questions yet.</div>;
 
   // Record all attempts to question history when quiz completes
   useEffect(() => {
@@ -799,6 +798,8 @@ function QuizMode({ sectionKey }) {
       });
     }
   }, [step]);
+
+  if (!qs.length) return <div className="text-gray-400 text-center py-12">No questions yet.</div>;
 
   if (step === "results") {
     const score = answers.filter(a => a.selected === a.correct).length;
