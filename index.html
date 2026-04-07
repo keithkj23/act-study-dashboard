@@ -684,6 +684,61 @@ function shuffle(arr) {
   return a;
 }
 
+// ═══ QUESTION HISTORY (rotation & dedup) ═══
+
+function getQuestionHistory(sectionKey) {
+  try {
+    const raw = localStorage.getItem(`act_question_history_${sectionKey}`);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function recordQuestionAttempt(sectionKey, questionId, isCorrect) {
+  const hist = getQuestionHistory(sectionKey);
+  const prev = hist[questionId] || { seen: 0, correct: 0, lastSeen: 0 };
+  hist[questionId] = {
+    seen: prev.seen + 1,
+    correct: prev.correct + (isCorrect ? 1 : 0),
+    lastSeen: Date.now(),
+  };
+  try { localStorage.setItem(`act_question_history_${sectionKey}`, JSON.stringify(hist)); } catch {}
+}
+
+function getRotatedQuestions(sectionKey) {
+  const pool = QUESTIONS[sectionKey] || [];
+  if (!pool.length) return [];
+  const hist = getQuestionHistory(sectionKey);
+
+  const neverSeen = [];
+  const prevIncorrect = [];
+  const prevCorrect = [];
+
+  pool.forEach(q => {
+    const h = hist[q.id];
+    if (!h) neverSeen.push(q);
+    else if (h.correct < h.seen) prevIncorrect.push(q);
+    else prevCorrect.push(q);
+  });
+
+  // Sort incorrect and correct by lastSeen ascending (least recent first)
+  prevIncorrect.sort((a, b) => (hist[a.id].lastSeen || 0) - (hist[b.id].lastSeen || 0));
+  prevCorrect.sort((a, b) => (hist[a.id].lastSeen || 0) - (hist[b.id].lastSeen || 0));
+
+  return [...shuffle(neverSeen), ...prevIncorrect, ...prevCorrect];
+}
+
+function shuffleChoices(question) {
+  const choices = question.choices;
+  if (!choices || choices.length === 0) return question;
+  // Build array of indices [0, 1, 2, 3], shuffle them
+  const indices = choices.map((_, i) => i);
+  const shuffled = shuffle(indices);
+  const newChoices = shuffled.map(i => choices[i]);
+  // Find where the original answer index ended up
+  const newAnswer = shuffled.indexOf(question.answer);
+  return { ...question, choices: newChoices, answer: newAnswer };
+}
+
 function FlashcardsMode({ sectionKey }) {
   const cards = FLASHCARDS[sectionKey] || [];
   const [idx, setIdx] = useState(0);
@@ -726,15 +781,24 @@ function StudyNotesMode({ sectionKey }) {
 function QuizMode({ sectionKey }) {
   const pool = QUESTIONS[sectionKey] || [];
   const meta = SECTIONS[sectionKey];
-  const [qs, setQs] = useState(() => shuffle(pool));
+  const [qs, setQs] = useState(() => getRotatedQuestions(sectionKey).map(shuffleChoices));
   const [step, setStep] = useState("quiz");
   const [idx, setIdx] = useState(0);
   const [selected, setSelected] = useState(null);
   const [submitted, setSubmitted] = useState(false);
   const [answers, setAnswers] = useState([]);
 
-  const reset = () => { setQs(shuffle(pool)); setStep("quiz"); setIdx(0); setSelected(null); setSubmitted(false); setAnswers([]); };
+  const reset = () => { setQs(getRotatedQuestions(sectionKey).map(shuffleChoices)); setStep("quiz"); setIdx(0); setSelected(null); setSubmitted(false); setAnswers([]); };
   if (!qs.length) return <div className="text-gray-400 text-center py-12">No questions yet.</div>;
+
+  // Record all attempts to question history when quiz completes
+  useEffect(() => {
+    if (step === "results" && answers.length > 0) {
+      answers.forEach(a => {
+        recordQuestionAttempt(sectionKey, qs[a.q].id, a.selected === a.correct);
+      });
+    }
+  }, [step]);
 
   if (step === "results") {
     const score = answers.filter(a => a.selected === a.correct).length;
@@ -886,12 +950,17 @@ const SIM_SECTIONS = [
 ];
 
 function genSimQs(key) {
-  const pool = QUESTIONS[key] || [];
-  if (!pool.length) return [];
-  const n = Math.min(SECTIONS[key]?.questions || pool.length, pool.length * 3);
-  // Shuffle and repeat questions to fill the section, then shuffle the whole set
-  const repeated = Array.from({ length: n }, (_, i) => ({ ...pool[i % pool.length], _id: i }));
-  return shuffle(repeated);
+  const rotated = getRotatedQuestions(key);
+  if (!rotated.length) return [];
+  const n = Math.min(SECTIONS[key]?.questions || rotated.length, rotated.length * 3);
+  // Fill to required count by cycling through rotated list (max diversity per cycle)
+  // Each question gets shuffleChoices applied independently, so even repeated questions
+  // will have different choice orderings, making memorization of positions useless.
+  const result = Array.from({ length: n }, (_, i) =>
+    shuffleChoices({ ...rotated[i % rotated.length], _id: i })
+  );
+  // Shuffle the final list so repeated questions aren't clustered together
+  return shuffle(result);
 }
 
 function TestSimulator({ onExit, onFinish, history }) {
@@ -958,6 +1027,8 @@ function TestSimulator({ onExit, onFinish, history }) {
         const userPick = answers[`${si}-${qi}`];
         const isCorrect = userPick != null && userPick === q.answer;
         if (isCorrect) correct++;
+        // Record attempt to question history for rotation/dedup
+        if (q.id != null) recordQuestionAttempt(sec.key, q.id, isCorrect);
         secReview.push({ question: q.question, choices: q.choices, answer: q.answer, picked: userPick, correct: isCorrect, context: q.context, explanation: q.explanation });
       });
       results[sec.key] = { correct, total: secQs.length, pct: secQs.length > 0 ? Math.round((correct / secQs.length) * 100) : 0 };
