@@ -24,10 +24,30 @@
 // ═══════════════════════════════════════════════════════════
 // SUPABASE CONFIG — Replace these with YOUR project values
 // ═══════════════════════════════════════════════════════════
-const SUPABASE_URL = 'https://jrugwckfoeyyjcxrrgjl.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpydWd3Y2tmb2V5eWpjeHJyZ2psIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MDIwNzEsImV4cCI6MjA4OTM3ODA3MX0.GzH1pOElTTwQmfzGS0Y3-D_9E0o2KLLfLJku6OWKdzs';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL_HERE';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY_HERE';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// ═══════════════════════════════════════════════════════════
+// DEMO MODE — Active when credentials are placeholders
+// ═══════════════════════════════════════════════════════════
+const DEMO_MODE = SUPABASE_URL.includes('YOUR_SUPABASE_URL_HERE');
+
+const DEMO_USER = {
+  id: 'demo-user-001',
+  email: 'demo@example.com',
+  created_at: new Date().toISOString(),
+  user_metadata: {
+    first_name: 'Demo',
+    last_name: 'Student',
+    display_name: 'Demo Student',
+    test_date: null
+  }
+};
+
+// Only create the Supabase client if we have real credentials
+const supabase = DEMO_MODE
+  ? null
+  : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ═══════════════════════════════════════════════════════════
 // AUTH SCREEN — Login / Sign Up
@@ -206,6 +226,7 @@ function AuthScreen({ onLogin }) {
 // CLOUD SYNC HELPERS — Save/load progress from Supabase
 // ═══════════════════════════════════════════════════════════
 async function loadCloudProgress(userId) {
+  if (DEMO_MODE) return [];
   const { data, error } = await supabase
     .from('user_progress')
     .select('progress_data')
@@ -216,6 +237,7 @@ async function loadCloudProgress(userId) {
 }
 
 async function saveCloudProgress(userId, examHistory) {
+  if (DEMO_MODE) return;
   const payload = { user_id: userId, progress_data: { examHistory }, updated_at: new Date().toISOString() };
   const { error } = await supabase
     .from('user_progress')
@@ -230,6 +252,7 @@ async function saveCloudProgress(userId, examHistory) {
 const SESSION_TOKEN = crypto.randomUUID();
 
 async function registerSession(userId) {
+  if (DEMO_MODE) return;
   const { error } = await supabase
     .from('user_progress')
     .upsert({ user_id: userId, session_token: SESSION_TOKEN, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
@@ -237,6 +260,7 @@ async function registerSession(userId) {
 }
 
 async function checkSession(userId) {
+  if (DEMO_MODE) return true;
   const { data, error } = await supabase
     .from('user_progress')
     .select('session_token')
@@ -287,6 +311,7 @@ function ProfilePage({ user, onLogout }) {
   const showMsg = (type, text) => { setMessage({ type, text }); setTimeout(() => setMessage({ type: "", text: "" }), 5000); };
 
   const updateProfile = async () => {
+    if (DEMO_MODE) { showMsg("error", "Profile editing is disabled in demo mode."); return; }
     setLoading("profile");
     const { error } = await supabase.auth.updateUser({ data: { first_name: firstName, last_name: lastName, display_name: firstName, test_date: testDate || null } });
     if (error) showMsg("error", error.message);
@@ -295,6 +320,7 @@ function ProfilePage({ user, onLogout }) {
   };
 
   const updateEmail = async () => {
+    if (DEMO_MODE) { showMsg("error", "Email changes are disabled in demo mode."); return; }
     if (!newEmail) return;
     setLoading("email");
     const { error } = await supabase.auth.updateUser({ email: newEmail });
@@ -305,6 +331,7 @@ function ProfilePage({ user, onLogout }) {
   };
 
   const updatePassword = async () => {
+    if (DEMO_MODE) { showMsg("error", "Password changes are disabled in demo mode."); return; }
     if (newPassword.length < 6) { showMsg("error", "Password must be at least 6 characters."); return; }
     if (newPassword !== confirmPassword) { showMsg("error", "Passwords don't match."); return; }
     setLoading("password");
@@ -1962,13 +1989,25 @@ function ACTStudyHub({ user, onLogout }) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// DEMO MODE BANNER
+// ═══════════════════════════════════════════════════════════
+function DemoBanner() {
+  return (
+    <div className="fixed top-0 left-0 right-0 z-50 text-center py-1.5 text-xs font-semibold text-white tracking-wide" style={{ background: "linear-gradient(135deg, #F59E0B, #D97706)" }}>
+      Demo Mode — sign-ups disabled &middot; Study content works locally
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
 // APP WITH AUTH — Wraps everything with login/session check
 // ═══════════════════════════════════════════════════════════
 function AppWithAuth() {
-  const [user, setUser] = useState(null);
-  const [checking, setChecking] = useState(true);
+  const [user, setUser] = useState(DEMO_MODE ? DEMO_USER : null);
+  const [checking, setChecking] = useState(DEMO_MODE ? false : true);
 
   useEffect(() => {
+    if (DEMO_MODE) return; // Skip auth checks in demo mode
     // Check if user is already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user || null;
@@ -1986,6 +2025,7 @@ function AppWithAuth() {
   }, []);
 
   const handleLogout = async () => {
+    if (DEMO_MODE) return; // No-op in demo mode
     await supabase.auth.signOut();
     setUser(null);
   };
@@ -1997,7 +2037,14 @@ function AppWithAuth() {
   );
 
   if (!user) return <AuthScreen onLogin={setUser} />;
-  return <ACTStudyHub user={user} onLogout={handleLogout} />;
+  return (
+    <React.Fragment>
+      {DEMO_MODE && <DemoBanner />}
+      <div style={DEMO_MODE ? { paddingTop: '32px' } : {}}>
+        <ACTStudyHub user={user} onLogout={handleLogout} />
+      </div>
+    </React.Fragment>
+  );
 }
 
     // Mount the app
